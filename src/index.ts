@@ -9,7 +9,6 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { GraphQLClient } from "graphql-request";
 import { Handlers } from "./handlers.js";
-import packageJson from "../package.json" with { type: "json" };
 
 const AHA_API_TOKEN = process.env.AHA_API_TOKEN;
 const AHA_DOMAIN = process.env.AHA_DOMAIN;
@@ -39,7 +38,7 @@ class AhaMcp {
     this.server = new Server(
       {
         name: "aha-mcp",
-        version: packageJson.version,
+        version: "1.0.0",
       },
       {
         capabilities: {

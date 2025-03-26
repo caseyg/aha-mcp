@@ -39,15 +39,6 @@ npm run mcp-start
 
 For more details about authentication and API usage, see the [Aha! API documentation](https://www.aha.io/api).
 
-## Configuration
-
-Create a `.env` file in your project directory:
-
-```plaintext
-AHA_API_TOKEN=your_api_token_here
-AHA_DOMAIN=yourcompany.aha.io
-```
-
 ## IDE Integration
 
 ### VSCode
