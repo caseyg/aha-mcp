@@ -9,6 +9,7 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { GraphQLClient } from "graphql-request";
 import { Handlers } from "./handlers.js";
+import packageJson from "../package.json" with { type: "json" };
 
 const AHA_API_TOKEN = process.env.AHA_API_TOKEN;
 const AHA_DOMAIN = process.env.AHA_DOMAIN;
@@ -30,15 +31,15 @@ const client = new GraphQLClient(
   }
 );
 
-class AhaApiServer {
+class AhaMcp {
   private server: Server;
   private handlers: Handlers;
 
   constructor() {
     this.server = new Server(
       {
-        name: "aha-api-server",
-        version: "0.1.0",
+        name: "aha-mcp",
+        version: packageJson.version,
       },
       {
         capabilities: {
@@ -136,9 +137,9 @@ class AhaApiServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("Aha! API MCP server running on stdio");
+    console.error("Aha! MCP server running on stdio");
   }
 }
 
-const server = new AhaApiServer();
+const server = new AhaMcp();
 server.run().catch(console.error);
