@@ -4,19 +4,34 @@
   "description": "MCP server for accessing Aha! GraphQL API",
   "type": "module",
   "main": "build/index.js",
+  "bin": {
+    "aha-mcp": "./build/index.js"
+  },
+  "files": [
+    "build/**/*"
+  ],
   "scripts": {
     "build": "tsc && chmod +x build/index.js",
     "start": "node build/index.js",
-    "mcp-start": "npm run build && npm run start"
+    "mcp-start": "npm run build && npm run start",
+    "prepublishOnly": "npm run build"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "aha",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "api"
+  ],
+  "author": "Aha! (https://www.aha.io)",
   "license": "ISC",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
-    "@types/node": "^20.0.0",
     "graphql": "^16.0.0",
-    "graphql-request": "^6.0.0",
+    "graphql-request": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
     "typescript": "^5.0.0"
   }
 }

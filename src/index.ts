@@ -10,11 +10,11 @@ import {
 import { GraphQLClient } from "graphql-request";
 import { Handlers } from "./handlers.js";
 
-const AHA_TOKEN = process.env.AHA_TOKEN;
+const AHA_API_TOKEN = process.env.AHA_API_TOKEN;
 const AHA_DOMAIN = process.env.AHA_DOMAIN;
 
-if (!AHA_TOKEN) {
-  throw new Error("AHA_TOKEN environment variable is required");
+if (!AHA_API_TOKEN) {
+  throw new Error("AHA_API_TOKEN environment variable is required");
 }
 
 if (!AHA_DOMAIN) {
@@ -25,7 +25,7 @@ const client = new GraphQLClient(
   `https://${AHA_DOMAIN}.aha.io/api/v2/graphql`,
   {
     headers: {
-      Authorization: `Bearer ${AHA_TOKEN}`,
+      Authorization: `Bearer ${AHA_API_TOKEN}`,
     },
   }
 );

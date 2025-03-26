@@ -10,16 +10,6 @@ Model Context Protocol (MCP) server for accessing Aha! records through the MCP. 
 
 ## Installation
 
-### Using npm (recommended)
-
-```bash
-# Install globally from npm
-npm install -g @aha-app/aha-mcp
-
-# Run the server
-aha-mcp
-```
-
 ### Using npx
 
 ```bash
