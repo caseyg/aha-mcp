@@ -1,14 +1,46 @@
 # aha-mcp
 
-![License](https://img.shields.io/github/license/your-username/aha-mcp)
-![npm version](https://img.shields.io/npm/v/aha-api-server)
-![npm downloads](https://img.shields.io/npm/dm/aha-api-server)
-
 Model Context Protocol (MCP) server for accessing Aha! records through the MCP. This integration enables seamless interaction with Aha! features, requirements, and pages directly through the Model Context Protocol.
 
-## Setup Guide
+## Prerequisites
 
-### 1. Authentication Setup
+- Node.js v20 or higher
+- npm (usually comes with Node.js)
+- An Aha! account with API access
+
+## Installation
+
+### Using npm (recommended)
+
+```bash
+# Install globally from npm
+npm install -g @aha-app/aha-mcp
+
+# Run the server
+aha-mcp
+```
+
+### Using npx
+
+```bash
+npx -y @aha-app/aha-mcp@latest
+```
+
+### Manual Installation
+
+```bash
+# Clone the repository
+git clone https://github.com/aha-develop/aha-mcp.git
+cd aha-mcp
+
+# Install dependencies
+npm install
+
+# Run the server
+npm run mcp-start
+```
+
+## Authentication Setup
 
 1. Log in to your Aha! account at `<yourcompany>.aha.io`
 2. Visit [secure.aha.io/settings/api_keys](https://secure.aha.io/settings/api_keys)
@@ -17,47 +49,216 @@ Model Context Protocol (MCP) server for accessing Aha! records through the MCP. 
 
 For more details about authentication and API usage, see the [Aha! API documentation](https://www.aha.io/api).
 
-### 2. Installation
+## Configuration
 
-Choose one of these installation methods:
+Create a `.env` file in your project directory:
 
-```bash
-# Using npm (recommended)
-npm install aha-api-server
-
-# Using git
-git clone https://github.com/aha-develop/aha-mcp.git
-cd aha-mcp
-npm install
-```
-
-### 3. Configuration and Usage
-
-You can configure the MCP server using environment variables or command-line arguments.
-
-#### Using Environment Variables
-
-1. Create a `.env` file in the root directory:
-```bash
-touch .env
-```
-
-2. Add your configuration:
 ```plaintext
 AHA_API_TOKEN=your_api_token_here
 AHA_DOMAIN=yourcompany.aha.io
 ```
 
-#### Starting the Server
+## IDE Integration
 
-```bash
-npm run mcp-start
+### VSCode
+
+Add this to your `.vscode/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "aha-mcp": {
+      "command": "npx",
+      "args": ["-y", "@aha-app/aha-mcp"],
+      "env": {
+        "AHA_API_TOKEN": "your_api_token_here",
+        "AHA_DOMAIN": "yourcompany.aha.io"
+      }
+    }
+  }
+}
 ```
 
-<details>
-<summary>Optional Configuration</summary>
+### Cursor
 
-The following environment variables can be used to customize the server behavior:
+1. Go to Cursor Settings > MCP
+2. Click + Add new Global MCP Server
+3. Add the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "aha-mcp": {
+      "command": "npx",
+      "args": ["-y", "@aha-app/aha-mcp"],
+      "env": {
+        "AHA_API_TOKEN": "your_api_token_here",
+        "AHA_DOMAIN": "yourcompany.aha.io"
+      }
+    }
+  }
+}
+```
+
+### Cline
+
+Add the following to your `cline_mcp_settings.json` via Cline MCP Server settings:
+
+```json
+{
+  "mcpServers": {
+    "aha-mcp": {
+      "command": "npx",
+      "args": ["-y", "@aha-app/aha-mcp"],
+      "env": {
+        "AHA_API_TOKEN": "your_api_token_here",
+        "AHA_DOMAIN": "yourcompany.aha.io"
+      }
+    }
+  }
+}
+```
+
+### RooCode
+
+Open the MCP settings by either:
+- Clicking "Edit MCP Settings" in RooCode settings, or
+- Using the "RooCode: Open MCP Config" command in VS Code's command palette
+
+Then add:
+
+```json
+{
+  "mcpServers": {
+    "aha-mcp": {
+      "command": "npx",
+      "args": ["-y", "@aha-app/aha-mcp"],
+      "env": {
+        "AHA_API_TOKEN": "your_api_token_here",
+        "AHA_DOMAIN": "yourcompany.aha.io"
+      }
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+Add the following to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "aha-mcp": {
+      "command": "npx",
+      "args": ["-y", "@aha-app/aha-mcp"],
+      "env": {
+        "AHA_API_TOKEN": "your_api_token_here",
+        "AHA_DOMAIN": "yourcompany.aha.io"
+      }
+    }
+  }
+}
+```
+
+## Available MCP Tools
+
+### 1. get_record
+
+Retrieves an Aha! feature or requirement by reference number.
+
+**Parameters:**
+- `reference` (required): Reference number of the feature or requirement (e.g., "DEVELOP-123")
+
+**Example:**
+```json
+{
+  "reference": "DEVELOP-123"
+}
+```
+
+**Response:**
+```json
+{
+  "reference_num": "DEVELOP-123",
+  "name": "Feature name",
+  "description": "Feature description",
+  "workflow_status": {
+    "name": "In development",
+    "id": "123456"
+  }
+}
+```
+
+### 2. get_page
+
+Gets an Aha! page by reference number.
+
+**Parameters:**
+- `reference` (required): Reference number of the page (e.g., "ABC-N-213")
+- `includeParent` (optional): Include parent page information. Defaults to false.
+
+**Example:**
+```json
+{
+  "reference": "ABC-N-213",
+  "includeParent": true
+}
+```
+
+**Response:**
+```json
+{
+  "reference_num": "ABC-N-213",
+  "name": "Page title",
+  "body": "Page content",
+  "parent": {
+    "reference_num": "ABC-N-200",
+    "name": "Parent page"
+  }
+}
+```
+
+### 3. search_documents
+
+Searches for Aha! documents.
+
+**Parameters:**
+- `query` (required): Search query string
+- `searchableType` (optional): Type of document to search for (e.g., "Page"). Defaults to "Page"
+
+**Example:**
+```json
+{
+  "query": "product roadmap",
+  "searchableType": "Page"
+}
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "reference_num": "ABC-N-123",
+      "name": "Product Roadmap 2025",
+      "type": "Page",
+      "url": "https://company.aha.io/pages/ABC-N-123"
+    }
+  ],
+  "total_results": 1
+}
+```
+
+## Example Queries
+
+- "Get feature DEVELOP-123"
+- "Fetch the product roadmap page ABC-N-213"
+- "Search for pages about launch planning"
+- "Get requirement ADT-123-1"
+- "Find all pages mentioning Q2 goals"
+
+## Configuration Options
 
 | Variable | Description | Default |
 |----------|-------------|---------|
@@ -67,66 +268,10 @@ The following environment variables can be used to customize the server behavior
 | `PORT` | Port for SSE transport | 3000 |
 | `TRANSPORT` | Transport type (stdio or sse) | stdio |
 
-</details>
-
-## IDE Integration
-
-### VSCode Setup
-
-Add this to your `.vscode/settings.json`:
-
-```json
-{
-  "mcpServers": {
-    "aha-mcp": {
-      "command": "npm",
-      "args": ["run", "mcp-start"],
-      "cwd": "/path/to/aha-mcp"
-    }
-  }
-}
-```
-
-## Available MCP Tools
-
-The server provides the following tools:
-
-### get_record
-Retrieve an Aha! feature or requirement by reference number.
-```json
-{
-  "reference": "DEVELOP-123"
-}
-```
-
-### get_page
-Get an Aha! page by reference number.
-```json
-{
-  "reference": "ABC-N-213",
-  "includeParent": false
-}
-```
-
-### search_documents
-Search for Aha! documents.
-```json
-{
-  "query": "search term",
-  "searchableType": "Page"
-}
-```
-
-## Error Handling
-
-The server will respond with appropriate error messages if:
-- The API token is missing or invalid
-- The requested record is not found
-- The API request fails
-- Invalid parameters are provided to the tools
+## Troubleshooting
 
 <details>
-<summary>Troubleshooting</summary>
+<summary>Common Issues</summary>
 
 1. Authentication errors:
    - Verify your API token is correct in the `.env` file
@@ -142,4 +287,9 @@ The server will respond with appropriate error messages if:
    - Check your network connection
    - Verify your Aha! domain is accessible
    - Ensure your API token has not expired
+
+4. API Request failures:
+   - Check the reference numbers are correct
+   - Verify the searchable type is valid
+   - Ensure you have permissions to access the requested resources
 </details>
