@@ -13,7 +13,7 @@ Model Context Protocol (MCP) server for accessing Aha! records through the MCP. 
 ### Using npx
 
 ```bash
-npx -y @aha-app/aha-mcp@latest
+npx -y aha-mcp@latest
 ```
 
 ### Manual Installation
@@ -50,7 +50,7 @@ Add this to your `.vscode/settings.json`:
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "@aha-app/aha-mcp"],
+      "args": ["-y", "aha-mcp"],
       "env": {
         "AHA_API_TOKEN": "your_api_token_here",
         "AHA_DOMAIN": "yourcompany.aha.io"
@@ -71,7 +71,7 @@ Add this to your `.vscode/settings.json`:
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "@aha-app/aha-mcp"],
+      "args": ["-y", "aha-mcp"],
       "env": {
         "AHA_API_TOKEN": "your_api_token_here",
         "AHA_DOMAIN": "yourcompany.aha.io"
@@ -90,7 +90,7 @@ Add the following to your `cline_mcp_settings.json` via Cline MCP Server setting
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "@aha-app/aha-mcp"],
+      "args": ["-y", "aha-mcp"],
       "env": {
         "AHA_API_TOKEN": "your_api_token_here",
         "AHA_DOMAIN": "yourcompany.aha.io"
@@ -113,7 +113,7 @@ Then add:
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "@aha-app/aha-mcp"],
+      "args": ["-y", "aha-mcp"],
       "env": {
         "AHA_API_TOKEN": "your_api_token_here",
         "AHA_DOMAIN": "yourcompany.aha.io"
@@ -132,7 +132,7 @@ Add the following to your `claude_desktop_config.json`:
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "@aha-app/aha-mcp"],
+      "args": ["-y", "aha-mcp"],
       "env": {
         "AHA_API_TOKEN": "your_api_token_here",
         "AHA_DOMAIN": "yourcompany.aha.io"
