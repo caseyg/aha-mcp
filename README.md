@@ -39,22 +39,30 @@ npm run mcp-start
 
 For more details about authentication and API usage, see the [Aha! API documentation](https://www.aha.io/api).
 
+## Environment Variables
+
+This MCP server requires the following environment variables:
+
+- `AHA_API_TOKEN`: Your Aha! API token
+- `AHA_DOMAIN`: Your Aha! domain (e.g., yourcompany.aha.io)
+
 ## IDE Integration
+
+For security reasons, we recommend using your preferred secure method for managing environment variables rather than storing API tokens directly in editor configurations. Each editor has different security models and capabilities for handling sensitive information.
+
+Below are examples of how to configure various editors to use the aha-mcp server. You should adapt these examples to use your preferred secure method for providing the required environment variables.
 
 ### VSCode
 
-Add this to your `.vscode/settings.json`:
+Add this to your `.vscode/settings.json`, using your preferred method to securely provide the environment variables:
 
 ```json
 {
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "aha-mcp"],
-      "env": {
-        "AHA_API_TOKEN": "your_api_token_here",
-        "AHA_DOMAIN": "yourcompany.aha.io"
-      }
+      "args": ["-y", "aha-mcp"]
+      // Environment variables should be provided through your preferred secure method
     }
   }
 }
@@ -64,18 +72,15 @@ Add this to your `.vscode/settings.json`:
 
 1. Go to Cursor Settings > MCP
 2. Click + Add new Global MCP Server
-3. Add the following configuration:
+3. Add a configuration similar to:
 
 ```json
 {
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "aha-mcp"],
-      "env": {
-        "AHA_API_TOKEN": "your_api_token_here",
-        "AHA_DOMAIN": "yourcompany.aha.io"
-      }
+      "args": ["-y", "aha-mcp"]
+      // Environment variables should be provided through your preferred secure method
     }
   }
 }
@@ -83,18 +88,15 @@ Add this to your `.vscode/settings.json`:
 
 ### Cline
 
-Add the following to your `cline_mcp_settings.json` via Cline MCP Server settings:
+Add a configuration to your `cline_mcp_settings.json` via Cline MCP Server settings:
 
 ```json
 {
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "aha-mcp"],
-      "env": {
-        "AHA_API_TOKEN": "your_api_token_here",
-        "AHA_DOMAIN": "yourcompany.aha.io"
-      }
+      "args": ["-y", "aha-mcp"]
+      // Environment variables should be provided through your preferred secure method
     }
   }
 }
@@ -113,11 +115,8 @@ Then add:
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "aha-mcp"],
-      "env": {
-        "AHA_API_TOKEN": "your_api_token_here",
-        "AHA_DOMAIN": "yourcompany.aha.io"
-      }
+      "args": ["-y", "aha-mcp"]
+      // Environment variables should be provided through your preferred secure method
     }
   }
 }
@@ -125,18 +124,15 @@ Then add:
 
 ### Claude Desktop
 
-Add the following to your `claude_desktop_config.json`:
+Add a configuration to your `claude_desktop_config.json`:
 
 ```json
 {
   "mcpServers": {
     "aha-mcp": {
       "command": "npx",
-      "args": ["-y", "aha-mcp"],
-      "env": {
-        "AHA_API_TOKEN": "your_api_token_here",
-        "AHA_DOMAIN": "yourcompany.aha.io"
-      }
+      "args": ["-y", "aha-mcp"]
+      // Environment variables should be provided through your preferred secure method
     }
   }
 }
@@ -255,7 +251,7 @@ Searches for Aha! documents.
 <summary>Common Issues</summary>
 
 1. Authentication errors:
-   - Verify your API token is correct in the `.env` file
+   - Verify your API token is correct and properly set in your environment
    - Ensure the token has the necessary permissions in Aha!
    - Confirm you're using the correct Aha! domain
 
@@ -263,6 +259,7 @@ Searches for Aha! documents.
    - Ensure all dependencies are installed
    - Check the Node.js version is v20 or higher
    - Verify the TypeScript compilation succeeds
+   - Confirm environment variables are properly set and accessible
 
 3. Connection issues:
    - Check your network connection
@@ -273,4 +270,9 @@ Searches for Aha! documents.
    - Check the reference numbers are correct
    - Verify the searchable type is valid
    - Ensure you have permissions to access the requested resources
+
+5. Environment variable issues:
+   - Make sure environment variables are properly set and accessible to the MCP server
+   - Check that your secure storage method is correctly configured
+   - Verify that the environment variables are being passed to the MCP server process
 </details>
