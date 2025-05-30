@@ -31,9 +31,9 @@ export interface PageResponse {
 }
 
 // Regular expressions for validating reference numbers
-export const FEATURE_REF_REGEX = /^([A-Z]+)-(\d+)$/;
-export const REQUIREMENT_REF_REGEX = /^([A-Z]+)-(\d+)-(\d+)$/;
-export const NOTE_REF_REGEX = /^([A-Z]+)-N-(\d+)$/;
+export const FEATURE_REF_REGEX = /^([A-Z][A-Z0-9]*)-(\d+)$/;
+export const REQUIREMENT_REF_REGEX = /^([A-Z][A-Z0-9]*)-(\d+)-(\d+)$/;
+export const NOTE_REF_REGEX = /^([A-Z][A-Z0-9]*)-N-(\d+)$/;
 
 export interface SearchNode {
   name: string | null;
