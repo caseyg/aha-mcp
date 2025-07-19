@@ -2,6 +2,7 @@
 import 'dotenv/config';
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ErrorCode,
@@ -10,6 +11,8 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 import { GraphQLClient } from "graphql-request";
 import { Handlers } from "./handlers.js";
+import express from "express";
+import cors from "cors";
 
 const AHA_API_TOKEN = process.env.AHA_API_TOKEN;
 const AHA_DOMAIN = process.env.AHA_DOMAIN;
@@ -484,11 +487,70 @@ class AhaMcp {
 
   async run() {
     const transportType = process.env.TRANSPORT || "stdio";
+    const port = parseInt(process.env.PORT || "3000");
     
-    // For now, only support stdio transport as SSE requires HTTP server setup
-    const transport = new StdioServerTransport();
-    await this.server.connect(transport);
-    console.error("Aha! MCP server running on stdio");
+    if (transportType === "sse") {
+      await this.runSSEServer(port);
+    } else {
+      const transport = new StdioServerTransport();
+      await this.server.connect(transport);
+      console.error("Aha! MCP server running on stdio");
+    }
+  }
+
+  private async runSSEServer(port: number) {
+    const app = express();
+    app.use(cors());
+    app.use(express.json({ limit: "100mb" }));
+
+    const transports = new Map<string, SSEServerTransport>();
+
+    // Handle SSE connections
+    app.get("/sse", async (_req, res) => {
+      console.error(`New SSE connection`);
+      
+      const transport = new SSEServerTransport("/message", res);
+      transports.set(transport.sessionId, transport);
+      
+      transport.onclose = () => {
+        console.error(`SSE connection closed`);
+        transports.delete(transport.sessionId);
+      };
+      
+      // connect() automatically calls start() on the transport
+      await this.server.connect(transport);
+    });
+
+    // Handle message posting
+    app.post("/message", async (req, res) => {
+      const sessionId = req.query.sessionId as string;
+      const transport = transports.get(sessionId);
+      
+      if (!transport) {
+        return res.status(404).json({ error: "Session not found" });
+      }
+      
+      try {
+        await transport.handlePostMessage(req, res, req.body);
+      } catch (error) {
+        console.error("Error handling message:", error);
+        res.status(500).json({ error: "Internal server error" });
+      }
+    });
+
+    // Health check endpoint
+    app.get("/health", (_req, res) => {
+      res.json({ 
+        status: "healthy", 
+        activeConnections: transports.size,
+        timestamp: new Date().toISOString()
+      });
+    });
+
+    app.listen(port, () => {
+      console.error(`Aha! MCP server running on SSE at http://localhost:${port}/sse`);
+      console.error(`Health check available at http://localhost:${port}/health`);
+    });
   }
 }
 

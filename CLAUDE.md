@@ -10,6 +10,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npm run mcp-start` - Build and start in one command
 - `npm run prepublishOnly` - Build before publishing to npm
 
+### Transport Options
+- **stdio (default)**: `npm run mcp-start`
+  - For IDE integrations like Claude Code
+- **SSE**: `TRANSPORT=sse npm run mcp-start` or `TRANSPORT=sse PORT=3000 npm run mcp-start`
+  - For web applications and HTTP-based integrations
+  - Endpoints available: `/sse` (connection), `/message` (messaging), `/health` (status)
+
 ### Development Requirements
 - Node.js v20 or higher required
 - TypeScript project targeting ES2020 with NodeNext modules
@@ -51,8 +58,8 @@ Required:
 
 Optional:
 - `LOG_LEVEL` - Logging level (default: info)
-- `PORT` - Port for SSE transport (default: 3000)
 - `TRANSPORT` - Transport type: stdio or sse (default: stdio)
+- `PORT` - Port for SSE transport (default: 3000)
 
 ### Reference Number Formats
 - Features: `/^[A-Z0-9]+-\d+$/` (e.g., DEVELOP-123)
@@ -65,7 +72,7 @@ Optional:
 - The project uses `@modelcontextprotocol/sdk` for MCP protocol implementation
 - GraphQL requests use `graphql-request` library
 - All errors should use appropriate MCP error codes (InvalidParams, InternalError)
-- The server primarily uses stdio transport for IDE integrations
+- The server supports both stdio transport (for IDE integrations) and SSE transport (for web applications)
 - TypeScript strict mode is enabled - maintain type safety
 - Output is built to `build/` directory
 - The package is published to npm as `aha-mcp`
