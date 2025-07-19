@@ -1,5 +1,6 @@
 export interface Description {
   htmlBody: string;
+  markdownBody?: string;
 }
 
 export interface Record {
@@ -16,9 +17,12 @@ export interface RequirementResponse {
 }
 
 export interface PageResponse {
-  page: {
+  note: {
+    referenceNum: string;
     name: string;
-    description: Description;
+    description: {
+      htmlBody: string;
+    };
     children: Array<{
       name: string;
       referenceNum: string;
@@ -50,4 +54,111 @@ export interface SearchResponse {
     totalPages: number;
     isLastPage: boolean;
   };
+}
+
+export interface WorkflowStatus {
+  id: string;
+  name: string;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  email?: string;
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+}
+
+export interface Release {
+  id: string;
+  referenceNum: string;
+  name: string;
+}
+
+export interface Epic {
+  id: string;
+  referenceNum: string;
+  name: string;
+}
+
+export interface Goal {
+  id: string;
+  referenceNum: string;
+  name: string;
+}
+
+export interface Feature {
+  id: string;
+  referenceNum: string;
+  name: string;
+  description?: {
+    htmlBody: string;
+  };
+  workflowStatus?: WorkflowStatus;
+  release?: Release;
+  epic?: Epic;
+  assignedToUser?: User;
+  tags?: Tag[];
+  startDate?: string;
+  dueDate?: string;
+  score?: number;
+  progress?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  goals?: Goal[];
+  watchers?: User[];
+  customFieldValues?: Array<{
+    id: string;
+    value: any;
+    customField: {
+      id: string;
+      name: string;
+      apiKey: string;
+    };
+  }>;
+}
+
+export interface CreateFeatureResponse {
+  createFeature: {
+    feature: Feature;
+    errors: Array<{
+      message: string;
+      attribute: string;
+    }>;
+  };
+}
+
+export interface UpdateFeatureResponse {
+  updateFeature: {
+    feature: Feature;
+    errors: Array<{
+      message: string;
+      attribute: string;
+    }>;
+  };
+}
+
+export interface DeleteFeatureResponse {
+  deleteFeature: {
+    errors: Array<{
+      message: string;
+      attribute: string;
+    }>;
+  };
+}
+
+export interface ListFeaturesResponse {
+  features: {
+    nodes: Feature[];
+    currentPage: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
+
+export interface GetFeatureDetailsResponse {
+  feature: Feature;
 }

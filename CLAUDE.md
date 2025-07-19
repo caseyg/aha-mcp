@@ -28,6 +28,12 @@ This is an MCP (Model Context Protocol) server that integrates with Aha!'s Graph
 1. `get_record` - Fetches features (DEVELOP-123) or requirements (ADT-123-1)
 2. `get_page` - Fetches pages (ABC-N-213) with optional parent info
 3. `search_documents` - Searches Aha! documents by query and type
+4. `create_feature` - Creates new features in a release
+5. `update_feature` - Updates existing feature properties
+6. `delete_feature` - Deletes a feature
+7. `list_features` - Lists features with filtering options
+8. `get_feature_details` - Gets comprehensive feature information
+9. `introspection` - Performs GraphQL introspection to explore the API schema (may be disabled in production)
 
 ### Environment Variables
 Required:

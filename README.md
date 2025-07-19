@@ -241,6 +241,113 @@ Searches for Aha! documents.
 }
 ```
 
+### 4. create_feature
+
+Creates a new feature in Aha!
+
+**Parameters:**
+
+- `releaseId` (required): ID or reference number of the release
+- `name` (required): Name of the feature
+- `description` (optional): Description of the feature (supports markdown)
+- `assignedToUserId` (optional): ID of the user to assign the feature to
+- `tags` (optional): Array of tags to add to the feature
+- `workflowStatusId` (optional): ID of the workflow status
+- `epicId` (optional): ID or reference number of the epic
+- `teamId` (optional): ID of the team to assign the feature to
+
+**Example:**
+
+```json
+{
+  "releaseId": "PRJ1-R-1",
+  "name": "New Authentication System",
+  "description": "Implement OAuth 2.0 authentication",
+  "tags": ["security", "backend"]
+}
+```
+
+### 5. update_feature
+
+Updates an existing feature in Aha!
+
+**Parameters:**
+
+- `id` (required): ID or reference number of the feature
+- `name` (optional): New name for the feature
+- `description` (optional): New description for the feature (supports markdown)
+- `workflowStatusId` (optional): ID of the new workflow status
+- `assignedToUserId` (optional): ID of the user to reassign the feature to
+- `tags` (optional): New tags for the feature
+
+**Example:**
+
+```json
+{
+  "id": "DEVELOP-123",
+  "name": "Updated Feature Name",
+  "workflowStatusId": "123456"
+}
+```
+
+### 6. delete_feature
+
+Deletes a feature from Aha!
+
+**Parameters:**
+
+- `id` (required): ID or reference number of the feature to delete
+
+**Example:**
+
+```json
+{
+  "id": "DEVELOP-123"
+}
+```
+
+### 7. list_features
+
+Lists features in Aha! with optional filters
+
+**Parameters:**
+
+- `releaseId` (optional): Filter by release ID or reference
+- `epicId` (optional): Filter by epic ID or reference
+- `productId` (optional): Filter by product ID or reference
+- `goalId` (optional): Filter by goal ID or reference
+- `initiativeId` (optional): Filter by initiative ID or reference
+- `page` (optional): Page number for pagination
+- `perPage` (optional): Number of items per page
+
+**Example:**
+
+```json
+{
+  "releaseId": "PRJ1-R-1",
+  "page": 1,
+  "perPage": 20
+}
+```
+
+### 8. get_feature_details
+
+Gets detailed information about a specific feature
+
+**Parameters:**
+
+- `id` (required): ID or reference number of the feature
+
+**Example:**
+
+```json
+{
+  "id": "DEVELOP-123"
+}
+```
+
+**Response includes:** Full feature details including workflow status, release, epic, assigned user, tags, dates, progress, goals, watchers, and custom fields.
+
 ## Example Queries
 
 - "Get feature DEVELOP-123"
