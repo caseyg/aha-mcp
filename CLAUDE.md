@@ -22,6 +22,41 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - TypeScript project targeting ES2020 with NodeNext modules
 - No test framework configured - add tests if needed
 
+## Authentication Setup
+
+The server supports two authentication methods:
+
+### Option 1: API Token (Default)
+1. Get your API token from Aha! (Settings → Personal → API)
+2. Set environment variables:
+   ```bash
+   export AHA_API_TOKEN="your-api-token"
+   export AHA_DOMAIN="yourcompany"
+   ```
+
+### Option 2: OAuth2 (MCP-compliant)
+1. Register an OAuth application in Aha!:
+   - Go to Settings → Account → OAuth applications
+   - Create a new application
+   - Set redirect URL to match OAUTH_REDIRECT_URI (default: http://localhost:3000/oauth/callback)
+2. Set environment variables:
+   ```bash
+   export OAUTH_CLIENT_ID="your-client-id"
+   export OAUTH_CLIENT_SECRET="your-client-secret"
+   export OAUTH_REDIRECT_URI="http://localhost:3000/oauth/callback"  # optional
+   ```
+3. When using OAuth, you'll need to authenticate first:
+   - In OAuth mode, use the `auth_login` tool to get an authorization URL
+   - Open the URL in your browser and authorize the application
+   - The server will handle the callback and store your token
+
+#### OAuth Implementation Details
+- **PKCE Support**: Uses S256 code challenge method for enhanced security
+- **Resource Indicators**: Implements RFC 8707 for token audience binding
+- **Protected Resource Metadata**: Exposes `/.well-known/oauth-protected-resource` endpoint
+- **WWW-Authenticate Headers**: Returns proper 401 responses with resource metadata
+- **Token Validation**: Validates tokens are intended for this specific MCP server
+
 ## Architecture
 
 This is an MCP (Model Context Protocol) server that integrates with Aha!'s GraphQL API. The codebase follows a clean, modular structure:
@@ -52,10 +87,22 @@ This is an MCP (Model Context Protocol) server that integrates with Aha!'s Graph
     - Examples: explore "Idea" type, search for "create" mutations, find "idea" queries
 
 ### Environment Variables
+
+#### For API Token Authentication (Option 1)
 Required:
 - `AHA_API_TOKEN` - Authentication token for Aha! API
 - `AHA_DOMAIN` - Aha! domain (e.g., "yourcompany")
 
+#### For OAuth2 Authentication (Option 2)
+Required:
+- `OAUTH_CLIENT_ID` - OAuth application client ID
+- `OAUTH_CLIENT_SECRET` - OAuth application client secret
+
+Optional:
+- `OAUTH_REDIRECT_URI` - OAuth callback URL (default: http://localhost:3000/oauth/callback)
+- `AHA_DOMAIN` - Default Aha! domain for OAuth (optional)
+
+#### General Configuration
 Optional:
 - `LOG_LEVEL` - Logging level (default: info)
 - `TRANSPORT` - Transport type: stdio or sse (default: stdio)
