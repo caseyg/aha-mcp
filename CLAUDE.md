@@ -2,25 +2,36 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+This is a Python implementation of an MCP (Model Context Protocol) server for Aha! using FastMCP 2.0. It aims to provide a comprehensive interface to Aha!'s GraphQL and REST APIs with additional features beyond the original implementation.
+
+This implementation is based on the original TypeScript MCP server by Aha! but has been rewritten in Python using the FastMCP framework for better maintainability and enhanced functionality.
+
 ## Commands
 
 ### Build and Run
-- `npm run build` - Compile TypeScript to JavaScript
-- `npm run start` - Run the compiled server
-- `npm run mcp-start` - Build and start in one command
-- `npm run prepublishOnly` - Build before publishing to npm
+- `pip install -r requirements.txt` - Install Python dependencies
+- `python aha-mcp.py` - Run the server directly
+- `fastmcp run aha-mcp.py --transport http` - Run with FastMCP CLI
+
+### Testing
+- `pytest test_aha_mcp.py` - Run test suite
+- `pytest test_aha_mcp.py -v` - Run tests with verbose output
+- `pytest test_aha_mcp.py -k "test_name"` - Run specific test
+- `pytest test_aha_mcp.py --cov=aha-mcp` - Run with coverage (if coverage installed)
 
 ### Transport Options
-- **stdio (default)**: `npm run mcp-start`
-  - For IDE integrations like Claude Code
-- **SSE**: `TRANSPORT=sse npm run mcp-start` or `TRANSPORT=sse PORT=3000 npm run mcp-start`
-  - For web applications and HTTP-based integrations
-  - Endpoints available: `/sse` (connection), `/message` (messaging), `/health` (status)
+- **HTTP (only)**: `fastmcp run aha-mcp.py --transport http`
+  - Runs on port 8000 by default
+  - Provides OAuth discovery endpoints when OAuth credentials are configured
+  - Note: SSE transport not available in Python implementation
 
 ### Development Requirements
-- Node.js v20 or higher required
-- TypeScript project targeting ES2020 with NodeNext modules
-- No test framework configured - add tests if needed
+- Python 3.10 or higher required
+- FastMCP 2.0 framework
+- Dependencies: `fastmcp>=2.0.0`, `httpx`, `pytest`, `pytest-asyncio`, `python-dotenv`
+- Test framework: pytest with async support
 
 ## Authentication Setup
 
@@ -59,14 +70,23 @@ The server supports two authentication methods:
 
 ## Architecture
 
-This is an MCP (Model Context Protocol) server that integrates with Aha!'s GraphQL API. The codebase follows a clean, modular structure:
+### Python Implementation (aha-mcp.py)
+- **Single file**: `aha-mcp.py` - Complete implementation using FastMCP 2.0
+- **Test file**: `test_aha_mcp.py` - Comprehensive pytest test suite
+- **Framework**: FastMCP 2.0 provides MCP protocol handling and OAuth discovery
+- **API Integration**: Hybrid approach using GraphQL for most operations, REST API for unsupported features
+- **Authentication**: Centralized auth handling with support for both API tokens and OAuth2
+- **Error Handling**: Consistent error messages with proper MCP error codes
 
-- **Entry point**: `src/index.ts` - Sets up MCP server, validates environment, configures GraphQL client
-- **Tool handlers**: `src/handlers.ts` - Contains `Handlers` class with methods for each MCP tool
-- **GraphQL queries**: `src/queries.ts` - All GraphQL query strings
-- **Type definitions**: `src/types.ts` - TypeScript interfaces and validation regexes
+### Key Architectural Decisions
+1. **FastMCP Framework**: Simplifies MCP protocol implementation significantly
+2. **Single File Design**: All server logic in one file for easier maintenance
+3. **Stateless Operation**: No persistent storage, suitable for serverless deployment
+4. **Hybrid API Approach**: GraphQL primary, REST fallback for missing operations
+5. **Comprehensive Testing**: Full test coverage with mocked GraphQL responses
 
 ### MCP Tools Exposed
+
 1. `get_record` - Fetches features (DEVELOP-123), requirements (ADT-123-1), or ideas (ABC-I-123)
 2. `get_page` - Fetches pages (ABC-N-213) with optional parent info
 3. `search_documents` - Searches Aha! documents by query and type
@@ -78,10 +98,9 @@ This is an MCP (Model Context Protocol) server that integrates with Aha!'s Graph
 9. `get_idea` - Fetches an idea by ID or reference (ABC-I-123)
 10. `list_ideas` - Lists ideas for a project with filtering options
 11. `create_idea` - Creates new ideas in a project
-12. `update_idea` - Updates existing idea properties
-13. `delete_idea` - Deletes an idea
-14. `promote_idea` - Promotes an idea to a feature, epic, or requirement
-15. `introspection` - Performs GraphQL introspection to explore the API schema
+12. `update_idea` - Updates existing idea properties (limited by GraphQL API)
+13. `delete_idea` - Deletes an idea (uses REST API)
+14. `introspection` - Performs GraphQL introspection to explore the API schema
     - Supports generic type exploration with `queryType: "type"` and `typeName: "ModelName"`
     - Can search for specific queries/mutations with `searchTerm`
     - Examples: explore "Idea" type, search for "create" mutations, find "idea" queries
@@ -105,8 +124,7 @@ Optional:
 #### General Configuration
 Optional:
 - `LOG_LEVEL` - Logging level (default: info)
-- `TRANSPORT` - Transport type: stdio or sse (default: stdio)
-- `PORT` - Port for SSE transport (default: 3000)
+- `PORT` - Port for HTTP transport (default: 8000)
 
 ### Reference Number Formats
 - Features: `/^[A-Z0-9]+-\d+$/` (e.g., DEVELOP-123)
@@ -116,10 +134,36 @@ Optional:
 
 ## Key Development Notes
 
-- The project uses `@modelcontextprotocol/sdk` for MCP protocol implementation
-- GraphQL requests use `graphql-request` library
-- All errors should use appropriate MCP error codes (InvalidParams, InternalError)
-- The server supports both stdio transport (for IDE integrations) and SSE transport (for web applications)
-- TypeScript strict mode is enabled - maintain type safety
-- Output is built to `build/` directory
-- The package is published to npm as `aha-mcp`
+- Uses FastMCP 2.0 framework for simplified MCP implementation
+- Async/await pattern throughout with `httpx` for HTTP requests
+- Centralized error handling with RuntimeError for GraphQL errors
+- Single-file architecture reduces complexity
+- Tests use pytest with mocked GraphQL responses
+- OAuth token mapping stored in-memory (stateless design)
+- All errors use appropriate MCP error codes (InvalidParams, InternalError)
+- GraphQL requests handled via centralized `graphql()` function
+- REST API used sparingly for operations not supported by GraphQL
+
+### Documentation Structure
+- `README.md` - User-facing documentation with setup instructions
+- `TODO.md` - Implementation roadmap and API comparison table
+- `docs/` - Reference documentation including:
+  - `aha-rest-api/` - REST API endpoint documentation
+  - `fastmcp/` - FastMCP framework documentation
+
+## Known Limitations and Future Work
+
+### GraphQL API Limitations
+Some operations are not supported via GraphQL and require REST API:
+- **Idea scores and tags**: Updates only available via REST
+- **File attachments**: Upload/management only via REST
+- **User management**: CRUD operations only via REST
+- **Comment updates/deletes**: Only creation available in GraphQL
+
+### Planned Enhancements (See TODO.md for details)
+1. **REST API Integration**: Add REST client for unsupported GraphQL operations
+2. **MCP Prompts**: Add predefined prompts for common workflows
+3. **MCP Resources**: Expose Aha! data as resources (releases, backlog, etc.)
+4. **Additional Endpoints**: Releases, epics, requirements, users, workflows, custom fields
+
+Refer to TODO.md for the comprehensive GraphQL vs REST API comparison table and implementation priorities.

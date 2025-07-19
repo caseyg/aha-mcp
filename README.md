@@ -1,56 +1,71 @@
-# aha-mcp
+# Aha! MCP Server
 
-Model Context Protocol (MCP) server for accessing Aha! records through the MCP. This integration enables seamless interaction with Aha! features, requirements, and pages directly through the Model Context Protocol.
+A Python implementation of a Model Context Protocol (MCP) server for accessing Aha! records using FastMCP 2.0.
 
-## Prerequisites
+This implementation is based on the [original TypeScript MCP server by Aha!](https://github.com/aha-develop/aha-mcp) but has been rewritten in Python using the FastMCP framework, providing enhanced functionality including OAuth support, testing, and additional MCP tools.
 
-- Node.js v20 or higher
-- npm (usually comes with Node.js)
+## Quick Start
+
+### Prerequisites
+
+- Python 3.10 or higher
 - An Aha! account with API access
 
-## Installation
-
-### Using npx
-
-```bash
-npx -y aha-mcp@latest
-```
-
-### Manual Installation
+### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/aha-develop/aha-mcp.git
 cd aha-mcp
 
-# Install dependencies
-npm install
-
-# Run the server
-npm run mcp-start
+# Install Python dependencies
+pip install -r requirements.txt
 ```
 
-## Authentication Setup
+### Configuration
 
-1. Log in to your Aha! account at `<yourcompany>.aha.io`
-2. Visit [secure.aha.io/settings/api_keys](https://secure.aha.io/settings/api_keys)
-3. Click "Create new API key"
-4. Copy the token immediately (it won't be shown again)
+Create a `.env` file with your Aha! credentials:
 
-For more details about authentication and API usage, see the [Aha! API documentation](https://www.aha.io/api).
+**For API Token:**
+```env
+AHA_API_TOKEN=your-api-token
+AHA_DOMAIN=yoursubdomain
+```
 
-## Environment Variables
+**For OAuth:**
+```env
+OAUTH_CLIENT_ID=your-oauth-client-id
+OAUTH_CLIENT_SECRET=your-oauth-client-secret
+AHA_DOMAIN=yoursubdomain
+```
 
-This MCP server requires the following environment variables:
+### Running
 
-- `AHA_API_TOKEN`: Your Aha! API token
-- `AHA_DOMAIN`: Your Aha! domain (e.g., yourcompany if you access aha at yourcompany.aha.io)
+```bash
+# Run the server (defaults to HTTP transport)
+fastmcp run aha-mcp.py --transport http
+
+# Or run directly
+python aha-mcp.py
+```
+
+The server runs on HTTP transport at `http://localhost:8000`. When OAuth credentials are configured, it provides OAuth discovery endpoints for MCP-compliant authentication.
+
+## Getting Your Aha! Credentials
+
+### API Token
+1. Log in to your Aha! account
+2. Visit Settings → Personal → API
+3. Generate a new token
+
+### OAuth Credentials
+1. Go to Settings → Account → OAuth applications
+2. Create a new application
+3. Use the Client ID and Client Secret
 
 ## IDE Integration
 
-For security reasons, we recommend using your preferred secure method for managing environment variables rather than storing API tokens directly in editor configurations. Each editor has different security models and capabilities for handling sensitive information.
-
-Below are examples of how to configure various editors to use the aha-mcp server. You should adapt these examples to use your preferred secure method for providing the required environment variables.
+For security reasons, we recommend using your preferred secure method for managing environment variables rather than storing API tokens directly in editor configurations.
 
 ### VSCode
 
@@ -63,8 +78,8 @@ Add this to your `.vscode/settings.json`, using your preferred method to securel
   "mcp": {
     "servers": {
       "aha-mcp": {
-        "command": "npx",
-        "args": ["-y", "aha-mcp"]
+        "command": "python",
+        "args": ["/path/to/aha-mcp.py"]
         // Environment variables should be provided through your preferred secure method
       }
     }
@@ -82,8 +97,8 @@ Add this to your `.vscode/settings.json`, using your preferred method to securel
 {
   "mcpServers": {
     "aha-mcp": {
-      "command": "npx",
-      "args": ["-y", "aha-mcp"]
+      "command": "python",
+      "args": ["/path/to/aha-mcp.py"]
       // Environment variables should be provided through your preferred secure method
     }
   }
@@ -98,8 +113,8 @@ Add a configuration to your `cline_mcp_settings.json` via Cline MCP Server setti
 {
   "mcpServers": {
     "aha-mcp": {
-      "command": "npx",
-      "args": ["-y", "aha-mcp"]
+      "command": "python",
+      "args": ["/path/to/aha-mcp.py"]
       // Environment variables should be provided through your preferred secure method
     }
   }
@@ -119,8 +134,8 @@ Then add:
 {
   "mcpServers": {
     "aha-mcp": {
-      "command": "npx",
-      "args": ["-y", "aha-mcp"]
+      "command": "python",
+      "args": ["/path/to/aha-mcp.py"]
       // Environment variables should be provided through your preferred secure method
     }
   }
@@ -135,8 +150,8 @@ Add a configuration to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "aha-mcp": {
-      "command": "npx",
-      "args": ["-y", "aha-mcp"]
+      "command": "python",
+      "args": ["/path/to/aha-mcp.py"]
       // Environment variables should be provided through your preferred secure method
     }
   }
@@ -348,15 +363,107 @@ Gets detailed information about a specific feature
 
 **Response includes:** Full feature details including workflow status, release, epic, assigned user, tags, dates, progress, goals, watchers, and custom fields.
 
-## Example Queries
+### 9. get_idea
 
-- "Get feature DEVELOP-123"
-- "Fetch the product roadmap page ABC-N-213"
-- "Search for pages about launch planning"
-- "Get requirement ADT-123-1"
-- "Find all pages mentioning Q2 goals"
+Fetches an idea by ID or reference
 
-### 9. introspection
+**Parameters:**
+
+- `id` (required): ID or reference number of the idea (e.g., "ABC-I-123")
+
+**Example:**
+
+```json
+{
+  "id": "ABC-I-123"
+}
+```
+
+### 10. list_ideas
+
+Lists ideas for a project with optional filters
+
+**Parameters:**
+
+- `projectId` (required): ID or reference of the project
+- `assignedToUserId` (optional): Filter by assigned user ID
+- `promoted` (optional): Filter by promotion status (true/false)
+- `visibility` (optional): Filter by visibility
+- `page` (optional): Page number for pagination
+- `perPage` (optional): Number of items per page
+
+**Example:**
+
+```json
+{
+  "projectId": "PRJ1",
+  "promoted": false,
+  "page": 1,
+  "perPage": 20
+}
+```
+
+### 11. create_idea
+
+Creates a new idea in a project
+
+**Parameters:**
+
+- `projectId` (required): ID or reference of the project
+- `name` (required): Name of the idea
+- `assignedToUserId` (optional): ID of the user to assign the idea to
+- `workflowStatusId` (optional): ID of the workflow status
+
+**Example:**
+
+```json
+{
+  "projectId": "PRJ1",
+  "name": "New Dashboard Feature",
+  "assignedToUserId": "user123"
+}
+```
+
+### 12. update_idea
+
+Updates an existing idea
+
+**Parameters:**
+
+- `id` (required): ID or reference number of the idea
+- `name` (optional): New name for the idea
+- `assignedToUserId` (optional): ID of the user to reassign the idea to
+- `workflowStatusId` (optional): ID of the new workflow status
+
+**Note:** Due to GraphQL limitations, some fields like score, tags, description, and visibility cannot be updated through this tool.
+
+**Example:**
+
+```json
+{
+  "id": "ABC-I-123",
+  "name": "Updated Idea Name",
+  "workflowStatusId": "status456"
+}
+```
+
+### 13. delete_idea
+
+Deletes an idea from Aha!
+
+**Parameters:**
+
+- `id` (required): ID or reference number of the idea to delete
+
+**Example:**
+
+```json
+{
+  "id": "ABC-I-123"
+}
+```
+
+### 14. introspection
 
 Performs GraphQL introspection to explore the Aha! API schema with size-limited responses.
 
@@ -426,48 +533,99 @@ Performs GraphQL introspection to explore the Aha! API schema with size-limited 
 }
 ```
 
+## Example Queries
+
+- "Get feature DEVELOP-123"
+- "Fetch the product roadmap page ABC-N-213"
+- "Search for pages about launch planning"
+- "Get requirement ADT-123-1"
+- "Find all pages mentioning Q2 goals"
+- "Create a new feature for the Q1 release"
+- "Update the status of feature DEVELOP-456"
+- "List all ideas in project PRJ1"
+- "Delete idea ABC-I-789"
+
 ## Configuration Options
 
-| Variable        | Description                                 | Default  |
-| --------------- | ------------------------------------------- | -------- |
-| `AHA_API_TOKEN` | Your Aha! API token                         | Required |
-| `AHA_DOMAIN`    | Your Aha! domain (e.g., yourcompany.aha.io) | Required |
-| `LOG_LEVEL`     | Logging level (debug, info, warn, error)    | info     |
-| `PORT`          | Port for SSE transport                      | 3000     |
-| `TRANSPORT`     | Transport type (stdio or sse)               | stdio    |
+### Environment Variables
+
+| Variable        | Description                                          | Required |
+| --------------- | ---------------------------------------------------- | -------- |
+| `AHA_DOMAIN`    | Your Aha! subdomain (e.g., "yourcompany")          | Yes      |
+| `AHA_API_TOKEN` | Your Aha! API token                                | Yes*     |
+| `OAUTH_CLIENT_ID` | OAuth client ID                                   | Yes*     |
+| `OAUTH_CLIENT_SECRET` | OAuth client secret                           | Yes*     |
+| `OAUTH_REDIRECT_URI` | OAuth callback URL                             | No       |
+| `LOG_LEVEL`     | Logging level (debug, info, warn, error)           | No       |
+| `PORT`          | Port for HTTP transport                             | No       |
+
+*Either API token OR OAuth credentials are required
+
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest test_aha_mcp.py
+
+# Run with verbose output
+pytest test_aha_mcp.py -v
+
+# Run specific test
+pytest test_aha_mcp.py -k "test_name"
+
+# Run with coverage
+pytest test_aha_mcp.py --cov=aha-mcp
+```
+
+### Debug Mode
+
+```bash
+# Run with debug logging
+LOG_LEVEL=debug python aha-mcp.py
+```
 
 ## Troubleshooting
 
-<details>
-<summary>Common Issues</summary>
+### Common Issues
 
-1. Authentication errors:
+#### Authentication Errors
+- Verify your API token is correct and properly set in your environment
+- For OAuth, ensure both CLIENT_ID and CLIENT_SECRET are set
+- Confirm you're using the correct Aha! domain (subdomain only, not full URL)
 
-   - Verify your API token is correct and properly set in your environment
-   - Ensure the token has the necessary permissions in Aha!
-   - Confirm you're using the correct Aha! domain
+#### Python-Specific Issues
+- **ModuleNotFoundError**: Run `pip install -r requirements.txt`
+- **Python version**: Requires Python 3.10+ (check with `python --version`)
+- **OAuth discovery errors**: The server provides OAuth discovery endpoints when OAuth credentials are configured
+- **Connection refused**: Make sure to use `--transport http` when running with fastmcp
 
-2. Server won't start:
+#### General Issues
+- **Connection refused**: Check your network and Aha! domain
+- **Permission denied**: Verify your API token/OAuth app has necessary permissions
+- **Invalid references**: Use correct format (e.g., PROJ-123, ABC-I-456)
 
-   - Ensure all dependencies are installed
-   - Check the Node.js version is v20 or higher
-   - Verify the TypeScript compilation succeeds
-   - Confirm environment variables are properly set and accessible
+## Implementation Details
 
-3. Connection issues:
+This Python implementation:
+- Uses FastMCP 2.0 for simplified MCP protocol handling
+- Implements both API token and OAuth authentication
+- Provides 14 MCP tools for interacting with Aha!
+- Uses GraphQL for most operations with REST API fallback
+- Includes test coverage
+- Maintains stateless operation suitable for serverless deployment
 
-   - Check your network connection
-   - Verify your Aha! domain is accessible
-   - Ensure your API token has not expired
+### Why Python?
 
-4. API Request failures:
+This Python implementation offers several advantages:
+- Leverages FastMCP 2.0 for simplified MCP protocol handling
+- Provides OAuth support with discovery endpoints
+- Includes extensive test coverage
+- Offers additional tools and functionality
+- Simplifies setup and deployment
+- Makes the codebase more maintainable
 
-   - Check the reference numbers are correct
-   - Verify the searchable type is valid
-   - Ensure you have permissions to access the requested resources
+## License
 
-5. Environment variable issues:
-   - Make sure environment variables are properly set and accessible to the MCP server
-   - Check that your secure storage method is correctly configured
-   - Verify that the environment variables are being passed to the MCP server process
-   </details>
+MIT License - see LICENSE file for details.

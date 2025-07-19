@@ -2,3 +2,6 @@ build
 node_modules
 .env
 .DS_Store
+__pycache__
+.coverage
+docs/fastmcp/
