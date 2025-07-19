@@ -238,10 +238,137 @@ export const getFeatureDetailsQuery = `
   }
 `;
 
+export const getIdeaQuery = `
+  query GetIdea($id: ID!) {
+    idea(id: $id) {
+      id
+      referenceNum
+      name
+      description {
+        htmlBody
+      }
+      visibility
+      score
+      createdAt
+      updatedAt
+      promotedAt
+      portal {
+        id
+        name
+      }
+      assignedToUser {
+        id
+        name
+        email
+      }
+    }
+  }
+`;
+
+export const listIdeasQuery = `
+  query ListIdeas($filters: IdeaFilters!, $page: Int = 1, $per: Int = 20) {
+    ideas(filters: $filters, page: $page, per: $per) {
+      nodes {
+        id
+        referenceNum
+        name
+        description {
+          htmlBody
+        }
+        visibility
+        score
+        createdAt
+        updatedAt
+        assignedToUser {
+          id
+          name
+        }
+      }
+      currentPage
+      totalCount
+      totalPages
+    }
+  }
+`;
+
+export const createIdeaQuery = `
+  mutation CreateIdea($attributes: IdeaAttributes!) {
+    createIdea(attributes: $attributes) {
+      idea {
+        id
+        referenceNum
+        name
+        description {
+          htmlBody
+        }
+        visibility
+        assignedToUser {
+          id
+          name
+        }
+      }
+      errors {
+        message
+        attribute
+      }
+    }
+  }
+`;
+
+export const updateIdeaQuery = `
+  mutation UpdateIdea($id: ID!, $attributes: IdeaAttributes!) {
+    updateIdea(id: $id, attributes: $attributes) {
+      idea {
+        id
+        referenceNum
+        name
+        description {
+          htmlBody
+        }
+        visibility
+        assignedToUser {
+          id
+          name
+        }
+      }
+      errors {
+        message
+        attribute
+      }
+    }
+  }
+`;
+
+export const deleteIdeaQuery = `
+  mutation DeleteIdea($id: ID!) {
+    deleteIdea(id: $id) {
+      errors {
+        message
+        attribute
+      }
+    }
+  }
+`;
+
+export const promoteIdeaQuery = `
+  mutation PromoteIdea($id: ID!, $type: IdeaPromotableTypeEnum!, $projectId: ID, $releaseId: ID, $featureId: ID) {
+    promoteIdea(id: $id, type: $type, projectId: $projectId, releaseId: $releaseId, featureId: $featureId) {
+      idea {
+        id
+        referenceNum
+      }
+    }
+  }
+`;
+
 // Import introspection queries
 export { 
   introspectionQuery, 
-  simpleIntrospectionQuery, 
+  simpleIntrospectionQuery,
+  listTypesQuery, 
   queryTypeIntrospectionQuery,
-  mutationTypeIntrospectionQuery 
+  mutationTypeIntrospectionQuery,
+  typeIntrospectionQuery,
+  searchQueriesIntrospectionQuery,
+  searchMutationsIntrospectionQuery
 } from './introspectionQuery.js';

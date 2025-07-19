@@ -98,7 +98,17 @@ export const simpleIntrospectionQuery = `
       types {
         name
         kind
-        description
+      }
+    }
+  }
+`;
+
+export const listTypesQuery = `
+  query {
+    __schema {
+      types {
+        name
+        kind
       }
     }
   }
@@ -139,6 +149,102 @@ export const mutationTypeIntrospectionQuery = `
             }
           }
         }
+      }
+    }
+  }
+`;
+
+export const typeIntrospectionQuery = (typeName: string) => `
+  query TypeIntrospection {
+    __type(name: "${typeName}") {
+      name
+      kind
+      description
+      fields {
+        name
+        description
+        type {
+          kind
+          name
+          ofType {
+            kind
+            name
+          }
+        }
+      }
+    }
+  }
+`;
+
+export const searchQueriesIntrospectionQuery = (searchTerm: string) => `
+  query SearchQueries {
+    __schema {
+      queryType {
+        fields {
+          name
+          description
+          args {
+            name
+            description
+            type {
+              ...TypeRef
+            }
+            defaultValue
+          }
+          type {
+            ...TypeRef
+          }
+        }
+      }
+    }
+  }
+  
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
+      }
+    }
+  }
+`;
+
+export const searchMutationsIntrospectionQuery = (searchTerm: string) => `
+  query SearchMutations {
+    __schema {
+      mutationType {
+        fields {
+          name
+          description
+          args {
+            name
+            description
+            type {
+              ...TypeRef
+            }
+            defaultValue
+          }
+          type {
+            ...TypeRef
+          }
+        }
+      }
+    }
+  }
+  
+  fragment TypeRef on __Type {
+    kind
+    name
+    ofType {
+      kind
+      name
+      ofType {
+        kind
+        name
       }
     }
   }

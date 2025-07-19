@@ -25,7 +25,7 @@ This is an MCP (Model Context Protocol) server that integrates with Aha!'s Graph
 - **Type definitions**: `src/types.ts` - TypeScript interfaces and validation regexes
 
 ### MCP Tools Exposed
-1. `get_record` - Fetches features (DEVELOP-123) or requirements (ADT-123-1)
+1. `get_record` - Fetches features (DEVELOP-123), requirements (ADT-123-1), or ideas (ABC-I-123)
 2. `get_page` - Fetches pages (ABC-N-213) with optional parent info
 3. `search_documents` - Searches Aha! documents by query and type
 4. `create_feature` - Creates new features in a release
@@ -33,7 +33,16 @@ This is an MCP (Model Context Protocol) server that integrates with Aha!'s Graph
 6. `delete_feature` - Deletes a feature
 7. `list_features` - Lists features with filtering options
 8. `get_feature_details` - Gets comprehensive feature information
-9. `introspection` - Performs GraphQL introspection to explore the API schema (may be disabled in production)
+9. `get_idea` - Fetches an idea by ID or reference (ABC-I-123)
+10. `list_ideas` - Lists ideas for a project with filtering options
+11. `create_idea` - Creates new ideas in a project
+12. `update_idea` - Updates existing idea properties
+13. `delete_idea` - Deletes an idea
+14. `promote_idea` - Promotes an idea to a feature, epic, or requirement
+15. `introspection` - Performs GraphQL introspection to explore the API schema
+    - Supports generic type exploration with `queryType: "type"` and `typeName: "ModelName"`
+    - Can search for specific queries/mutations with `searchTerm`
+    - Examples: explore "Idea" type, search for "create" mutations, find "idea" queries
 
 ### Environment Variables
 Required:
@@ -49,6 +58,7 @@ Optional:
 - Features: `/^[A-Z0-9]+-\d+$/` (e.g., DEVELOP-123)
 - Requirements: `/^[A-Z0-9]+-\d+-\d+$/` (e.g., ADT-123-1)
 - Pages: `/^[A-Z0-9]+-N-\d+$/` (e.g., ABC-N-213)
+- Ideas: `/^[A-Z0-9]+-I-\d+$/` (e.g., ABC-I-123)
 
 ## Key Development Notes
 

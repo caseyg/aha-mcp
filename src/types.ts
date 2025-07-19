@@ -38,6 +38,7 @@ export interface PageResponse {
 export const FEATURE_REF_REGEX = /^([A-Z][A-Z0-9]*)-(\d+)$/;
 export const REQUIREMENT_REF_REGEX = /^([A-Z][A-Z0-9]*)-(\d+)-(\d+)$/;
 export const NOTE_REF_REGEX = /^([A-Z][A-Z0-9]*)-N-(\d+)$/;
+export const IDEA_REF_REGEX = /^([A-Z][A-Z0-9]*)-I-(\d+)$/;
 
 export interface SearchNode {
   name: string | null;
@@ -161,4 +162,76 @@ export interface ListFeaturesResponse {
 
 export interface GetFeatureDetailsResponse {
   feature: Feature;
+}
+
+export interface Portal {
+  id: string;
+  name: string;
+}
+
+export interface Idea {
+  id: string;
+  referenceNum: string;
+  name: string;
+  description?: {
+    htmlBody: string;
+  };
+  visibility?: string;
+  score?: number;
+  createdAt?: string;
+  updatedAt?: string;
+  promotedAt?: string;
+  portal?: Portal;
+  assignedToUser?: User;
+}
+
+export interface IdeaResponse {
+  idea: Idea;
+}
+
+export interface CreateIdeaResponse {
+  createIdea: {
+    idea: Idea;
+    errors: Array<{
+      message: string;
+      attribute: string;
+    }>;
+  };
+}
+
+export interface UpdateIdeaResponse {
+  updateIdea: {
+    idea: Idea;
+    errors: Array<{
+      message: string;
+      attribute: string;
+    }>;
+  };
+}
+
+export interface DeleteIdeaResponse {
+  deleteIdea: {
+    errors: Array<{
+      message: string;
+      attribute: string;
+    }>;
+  };
+}
+
+export interface ListIdeasResponse {
+  ideas: {
+    nodes: Idea[];
+    currentPage: number;
+    totalCount: number;
+    totalPages: number;
+  };
+}
+
+export interface PromoteIdeaResponse {
+  promoteIdea: {
+    idea: {
+      id: string;
+      referenceNum: string;
+    };
+  };
 }

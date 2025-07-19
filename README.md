@@ -356,6 +356,76 @@ Gets detailed information about a specific feature
 - "Get requirement ADT-123-1"
 - "Find all pages mentioning Q2 goals"
 
+### 9. introspection
+
+Performs GraphQL introspection to explore the Aha! API schema with size-limited responses.
+
+**Parameters:**
+
+- `queryType` (optional): Type of introspection query to run
+  - `"list-types"` (default): List available types (excludes internal __ types)
+  - `"simple"`: Same as list-types
+  - `"query"`: List available queries
+  - `"mutation"`: List available mutations
+  - `"type"`: Explore a specific type (requires `typeName`)
+  - `"search-queries"`: Search for queries by name/description
+  - `"search-mutations"`: Search for mutations by name/description
+- `typeName` (optional): Name of the type to introspect (required when queryType is "type")
+  - Examples: "Idea", "Feature", "Project", "User", "Release", "Epic"
+- `searchTerm` (optional): Search term for filtering results
+- `maxResults` (optional): Maximum number of results to return (default: 50)
+
+**Examples:**
+
+```json
+// List all available types
+{
+  "queryType": "list-types"
+}
+
+// Search for idea-related types
+{
+  "queryType": "list-types",
+  "searchTerm": "idea"
+}
+
+// Explore the Idea type structure
+{
+  "queryType": "type",
+  "typeName": "Idea"
+}
+
+// Search for queries related to ideas
+{
+  "queryType": "search-queries",
+  "searchTerm": "idea",
+  "maxResults": 20
+}
+
+// Find mutations for creating things
+{
+  "queryType": "search-mutations",
+  "searchTerm": "create",
+  "maxResults": 30
+}
+```
+
+**Note:** Full schema introspection is disabled due to response size limits. Use list-types first to discover available types, then explore specific types individually.
+
+**Pagination:** When using list-types, query, or mutation query types, the response includes pagination metadata:
+```json
+{
+  "data": { /* actual results */ },
+  "pagination": {
+    "totalCount": 150,      // Total items before filtering
+    "filteredCount": 45,    // Items after search filter
+    "returnedCount": 20,    // Items in this response
+    "hasMore": true,        // More results available
+    "maxResults": 20        // Current limit
+  }
+}
+```
+
 ## Configuration Options
 
 | Variable        | Description                                 | Default  |
