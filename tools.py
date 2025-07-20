@@ -5,6 +5,11 @@ import json
 from typing import Optional, List
 from fastmcp import FastMCP, Context
 from client import graphql, check_auth, rest_api
+from utils import (
+    require_auth, execute_graphql_query, execute_mutation, execute_rest_api,
+    build_filters, build_attributes, validate_reference, build_list_query,
+    CrudTemplates, build_standard_fields
+)
 
 # This will be set by the main module
 mcp: Optional[FastMCP] = None
@@ -15,24 +20,81 @@ def register_tools(mcp_instance: FastMCP):
     global mcp
     mcp = mcp_instance
     
-    # Register all tools
-    mcp.tool(get_record)
-    mcp.tool(search_documents)
-    mcp.tool(list_features)
-    mcp.tool(create_feature)
-    mcp.tool(update_feature)
-    mcp.tool(update_feature_tags)
-    mcp.tool(get_all_tags)
-    mcp.tool(delete_feature)
-    mcp.tool(get_feature_details)
-    mcp.tool(get_page)
-    mcp.tool(create_idea)
-    mcp.tool(get_idea)
-    mcp.tool(list_ideas)
-    mcp.tool(update_idea)
-    mcp.tool(delete_idea)
-    mcp.tool(list_projects)
-    mcp.tool(introspection)
+    # Core record tools
+    mcp.tool(get_record, tags={"records", "search"})
+    mcp.tool(search_documents, tags={"search", "documents"})
+    mcp.tool(get_page, tags={"pages", "documents"})
+    mcp.tool(list_projects, tags={"projects", "workspace"})
+    mcp.tool(introspection, tags={"api", "debug"})
+    
+    # Feature management tools
+    mcp.tool(list_features, tags={"features", "list"})
+    mcp.tool(create_feature, tags={"features", "create"})
+    mcp.tool(update_feature, tags={"features", "update"})
+    mcp.tool(delete_feature, tags={"features", "delete"})
+    mcp.tool(get_feature_details, tags={"features", "details"})
+    mcp.tool(update_feature_tags, tags={"features", "tags"})
+    mcp.tool(convert_feature_to_epic, tags={"features", "epics", "convert"})
+    
+    # Idea management tools
+    mcp.tool(create_idea, tags={"ideas", "create"})
+    mcp.tool(get_idea, tags={"ideas", "details"})
+    mcp.tool(list_ideas, tags={"ideas", "list"})
+    mcp.tool(update_idea, tags={"ideas", "update"})
+    mcp.tool(delete_idea, tags={"ideas", "delete"})
+    mcp.tool(promote_idea, tags={"ideas", "features", "promote"})
+    mcp.tool(update_idea_score, tags={"ideas", "scoring"})
+    mcp.tool(update_idea_tags, tags={"ideas", "tags"})
+    
+    # Epic management tools
+    mcp.tool(list_epics, tags={"epics", "list"})
+    mcp.tool(create_epic, tags={"epics", "create"})
+    mcp.tool(update_epic, tags={"epics", "update"})
+    mcp.tool(delete_epic, tags={"epics", "delete"})
+    
+    # Initiative management tools
+    mcp.tool(list_initiatives, tags={"initiatives", "list"})
+    mcp.tool(create_initiative, tags={"initiatives", "create"})
+    mcp.tool(update_initiative, tags={"initiatives", "update"})
+    mcp.tool(delete_initiative, tags={"initiatives", "delete"})
+    
+    # Release management tools
+    mcp.tool(list_releases, tags={"releases", "list"})
+    mcp.tool(create_release, tags={"releases", "create"})
+    mcp.tool(update_release, tags={"releases", "update"})
+    mcp.tool(delete_release, tags={"releases", "delete"})
+    mcp.tool(duplicate_release, tags={"releases", "duplicate"})
+    
+    # Goal management tools
+    mcp.tool(list_goals, tags={"goals", "list"})
+    mcp.tool(create_goal, tags={"goals", "create"})
+    mcp.tool(update_goal, tags={"goals", "update"})
+    mcp.tool(delete_goal, tags={"goals", "delete"})
+    
+    # Requirement management tools
+    mcp.tool(list_requirements, tags={"requirements", "list"})
+    mcp.tool(create_requirement, tags={"requirements", "create"})
+    mcp.tool(update_requirement, tags={"requirements", "update"})
+    mcp.tool(delete_requirement, tags={"requirements", "delete"})
+    
+    # Comment management tools
+    mcp.tool(create_comment, tags={"comments", "create"})
+    mcp.tool(update_comment, tags={"comments", "update"})
+    mcp.tool(delete_comment, tags={"comments", "delete"})
+    mcp.tool(list_comments, tags={"comments", "list"})
+    
+    # User management tools
+    mcp.tool(list_users, tags={"users", "list"})
+    mcp.tool(create_user, tags={"users", "create"})
+    
+    # Attachment management tools
+    mcp.tool(upload_attachment, tags={"attachments", "files"})
+    mcp.tool(delete_attachment, tags={"attachments", "files"})
+    
+    # Tag and metadata tools
+    mcp.tool(get_all_tags, tags={"tags", "metadata"})
+    mcp.tool(list_workflows, tags={"workflows", "metadata"})
+    mcp.tool(list_custom_fields, tags={"custom-fields", "metadata"})
 
 
 async def get_record(reference: str, ctx: Context = None) -> str:
@@ -867,3 +929,773 @@ async def introspection(
         return json.dumps({
             "error": "Invalid query_type. Use 'list-types', 'type' (with type_name), or 'search' (with optional search_term)"
         })
+
+
+# =============================================================================
+# NEW TOOLS - Priority Implementation Order
+# =============================================================================
+
+async def promote_idea(
+    id: str,
+    target_type: str,  # "feature" or "epic"
+    release_id: Optional[str] = None,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    assigned_to_user_id: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Convert idea to feature/epic using REST API"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    if target_type not in ["feature", "epic"]:
+        return json.dumps({"error": "target_type must be 'feature' or 'epic'"})
+    
+    # Use the documented REST API endpoint for promoting ideas
+    endpoint = f"/ideas/{id}/promote"
+    data = {
+        "promotable_type": target_type
+    }
+    
+    if release_id:
+        data["release_id"] = release_id
+    if name:
+        data["name"] = name
+    if description:
+        data["description"] = description
+    if assigned_to_user_id:
+        data["assigned_to_user_id"] = assigned_to_user_id
+    
+    return await execute_rest_api(ctx, "PUT", endpoint, data, f"promote idea to {target_type}")
+
+
+async def convert_feature_to_epic(id: str, ctx: Context = None) -> str:
+    """Feature conversion (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    endpoint = f"/features/{id}/convert_to_epic"
+    return await execute_rest_api(ctx, "POST", endpoint, operation="convert feature to epic")
+
+
+async def list_epics(
+    project_id: Optional[str] = None,
+    release_id: Optional[str] = None, 
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Context = None
+) -> str:
+    """List epics (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    filters = {}
+    if project_id: filters["projectId"] = project_id
+    if release_id: filters["releaseId"] = release_id
+    
+    if not filters:
+        return json.dumps({"error": "At least one filter required: project_id or release_id"})
+    
+    query, variables = build_list_query("epics", build_standard_fields("epic"), filters, page, per_page)
+    return await execute_graphql_query(ctx, query, variables, "epics", "list epics")
+
+
+
+async def create_epic(
+    release_id: str,
+    name: str,
+    description: Optional[str] = None,
+    assigned_to_user_id: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Create epics (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {"name": name},
+        {"description": description},
+        {"release": release_id, "assignedToUser": assigned_to_user_id}
+    )
+    
+    query = CrudTemplates.create_mutation("epic", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"attrs": attributes}, "createEpic", "epic", "create epic")
+
+
+
+async def update_epic(
+    id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    workflow_status_id: Optional[str] = None,
+    assigned_to_user_id: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Modify epics (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {},
+        {"name": name, "description": description},
+        {"workflowStatus": workflow_status_id, "assignedToUser": assigned_to_user_id}
+    )
+    
+    query = CrudTemplates.update_mutation("epic", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"id": id, "attrs": attributes}, "updateEpic", "epic", "update epic")
+
+
+
+async def delete_epic(id: str, ctx: Context = None) -> str:
+    """Remove epics (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    query = CrudTemplates.delete_mutation("epic")
+    return await execute_mutation(ctx, query, {"id": id}, "deleteEpic", "epic", "delete epic")
+
+
+
+async def list_initiatives(
+    project_id: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Context = None
+) -> str:
+    """List initiatives (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    filters = {}
+    if project_id: filters["projectId"] = project_id
+    
+    query, variables = build_list_query("initiatives", build_standard_fields("initiative"), filters, page, per_page)
+    return await execute_graphql_query(ctx, query, variables, "initiatives", "list initiatives")
+
+
+
+async def create_initiative(
+    project_id: str,
+    name: str,
+    description: Optional[str] = None,
+    assigned_to_user_id: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Create initiatives (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {"name": name},
+        {"description": description},
+        {"project": project_id, "assignedToUser": assigned_to_user_id}
+    )
+    
+    query = CrudTemplates.create_mutation("initiative", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"attrs": attributes}, "createInitiative", "initiative", "create initiative")
+
+
+
+async def update_initiative(
+    id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    workflow_status_id: Optional[str] = None,
+    assigned_to_user_id: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Modify initiatives (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {},
+        {"name": name, "description": description},
+        {"workflowStatus": workflow_status_id, "assignedToUser": assigned_to_user_id}
+    )
+    
+    query = CrudTemplates.update_mutation("initiative", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"id": id, "attrs": attributes}, "updateInitiative", "initiative", "update initiative")
+
+
+
+async def delete_initiative(id: str, ctx: Context = None) -> str:
+    """Remove initiatives (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/initiatives/{id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete initiative")
+
+
+
+async def create_comment(
+    record_id: str,
+    body: str,
+    record_type: str = "feature",  # feature, idea, epic, initiative, etc.
+    ctx: Context = None
+) -> str:
+    """Add comments to features/ideas/etc (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = {"body": body, "commentable": {"id": record_id, "typename": record_type.title()}}
+    
+    query = """mutation($attrs: CommentAttributes!) {
+        createComment(attributes: $attrs) {
+            comment { id body createdAt }
+            errors { attributes { name fullMessages } }
+        }
+    }"""
+    
+    return await execute_mutation(ctx, query, {"attrs": attributes}, "createComment", "comment", "create comment")
+
+
+
+async def update_comment(id: str, body: str, ctx: Context = None) -> str:
+    """Edit existing comments (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/comments/{id}"
+    data = {"comment": {"body": body}}
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update comment")
+
+
+
+async def delete_comment(id: str, ctx: Context = None) -> str:
+    """Remove comments (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/comments/{id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete comment")
+
+
+
+async def list_comments(
+    record_id: str,
+    record_type: str = "feature",
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Context = None
+) -> str:
+    """Get comments for a record (GraphQL available - no pagination)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    query = f"""query($id: ID!) {{
+        {record_type}(id: $id) {{
+            comments {{
+                id body createdAt
+                user {{ id name email }}
+            }}
+            commentsCount
+        }}
+    }}"""
+    
+    try:
+        data = await graphql(ctx, query, {"id": record_id})
+        record_data = data.get(record_type, {})
+        comments = record_data.get("comments", [])
+        comments_count = record_data.get("commentsCount", 0)
+        
+        # Simulate pagination since GraphQL doesn't support it for comments
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_comments = comments[start_idx:end_idx]
+        
+        return json.dumps({
+            "comments": paginated_comments,
+            "currentPage": page,
+            "totalCount": comments_count,
+            "totalPages": (comments_count + per_page - 1) // per_page,
+            "note": "Client-side pagination simulation (GraphQL comments don't support server-side pagination)"
+        }, indent=2)
+        
+    except Exception as e:
+        return json.dumps({"error": f"Failed to list comments for {record_type}: {str(e)}"}, indent=2)
+
+
+
+async def list_releases(
+    project_id: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Context = None
+) -> str:
+    """List releases in a project (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    filters = {}
+    if project_id: filters["projectId"] = project_id
+    
+    query, variables = build_list_query("releases", build_standard_fields("release"), filters, page, per_page)
+    return await execute_graphql_query(ctx, query, variables, "releases", "list releases")
+
+
+
+async def create_release(
+    project_id: str,
+    name: str,
+    description: Optional[str] = None,
+    start_date: Optional[str] = None,
+    release_date: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Create new releases (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {"name": name},
+        {"developmentStartedOn": start_date, "releaseDate": release_date},
+        {"project": project_id}
+    )
+    
+    query = CrudTemplates.create_mutation("release", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"attrs": attributes}, "createRelease", "release", "create release")
+
+
+
+async def update_release(
+    id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    start_date: Optional[str] = None,
+    release_date: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Modify releases (GraphQL available)"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {},
+        {"name": name, "developmentStartedOn": start_date, "releaseDate": release_date}
+    )
+    
+    query = CrudTemplates.update_mutation("release", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"id": id, "attrs": attributes}, "updateRelease", "release", "update release")
+
+
+
+async def delete_release(id: str, ctx: Context = None) -> str:
+    """Remove releases (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/releases/{id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete release")
+
+
+
+async def update_idea_score(
+    id: str,
+    score: float,
+    ctx: Context = None
+) -> str:
+    """Update idea scores via REST API"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # First get the current idea to understand its scorecard structure
+    try:
+        idea_response = await rest_api(ctx, "GET", f"/ideas/{id}")
+        current_score_facts = idea_response.get("idea", {}).get("score_facts", [])
+        
+        if not current_score_facts:
+            return json.dumps({"error": f"Idea {id} has no existing scorecard to update"})
+        
+        # Update the first score fact with the new total score
+        # In a real implementation, you might want to distribute this across metrics
+        updated_score_facts = current_score_facts.copy()
+        if updated_score_facts:
+            updated_score_facts[0]["value"] = int(score)
+        
+        endpoint = f"/ideas/{id}"
+        data = {
+            "idea": {
+                "score_facts": updated_score_facts
+            }
+        }
+        return await execute_rest_api(ctx, "PUT", endpoint, data, "update idea score")
+        
+    except Exception as e:
+        return json.dumps({"error": f"Failed to get current scorecard for idea {id}: {str(e)}"})
+
+
+
+async def update_idea_tags(
+    id: str,
+    tags: List[str],
+    ctx: Context = None
+) -> str:
+    """Set/update tags on ideas via REST API"""
+    
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Use the documented REST API endpoint for updating idea tags
+    endpoint = f"/ideas/{id}"
+    data = {
+        "idea": {
+            "tags": ", ".join(tags)
+        }
+    }
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update idea tags")
+
+
+# =============================================================================
+# GOAL MANAGEMENT TOOLS
+# =============================================================================
+
+async def list_goals(
+    project_id: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Context = None
+) -> str:
+    """List goals (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    filters = {}
+    if project_id: filters["projectId"] = project_id
+    
+    query, variables = build_list_query("goals", build_standard_fields("goal"), filters, page, per_page)
+    return await execute_graphql_query(ctx, query, variables, "goals", "list goals")
+
+
+async def create_goal(
+    project_id: str,
+    name: str,
+    metric_name: Optional[str] = None,
+    workflow_status_id: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Create goals (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {"name": name},
+        {"successMetric": {"name": metric_name} if metric_name else None},
+        {"project": project_id, "workflowStatus": workflow_status_id}
+    )
+    
+    query = CrudTemplates.create_mutation("goal", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"attrs": attributes}, "createGoal", "goal", "create goal")
+
+
+async def update_goal(
+    id: str,
+    name: Optional[str] = None,
+    metric_name: Optional[str] = None,
+    workflow_status_id: Optional[str] = None,
+    ctx: Context = None
+) -> str:
+    """Modify goals (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {},
+        {"name": name, "successMetric": {"name": metric_name} if metric_name else None},
+        {"workflowStatus": workflow_status_id}
+    )
+    
+    query = CrudTemplates.update_mutation("goal", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"id": id, "attrs": attributes}, "updateGoal", "goal", "update goal")
+
+
+async def delete_goal(id: str, ctx: Context = None) -> str:
+    """Remove goals (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/goals/{id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete goal")
+
+
+# =============================================================================
+# ATTACHMENT MANAGEMENT TOOLS
+# =============================================================================
+
+async def upload_attachment(
+    resource_type: str,
+    resource_id: str,
+    file_url: str,
+    file_name: str,
+    content_type: str = "application/octet-stream",
+    ctx: Context = None
+) -> str:
+    """Upload files to records via URL (REST only)
+    
+    Args:
+        resource_type: Type of resource (comments, notes, tasks, custom_fields, etc.)
+        resource_id: ID of the resource to attach to
+        file_url: URL of the file to attach
+        file_name: Name for the attachment
+        content_type: MIME type of the file
+    """
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Map resource types to API endpoints
+    endpoint_map = {
+        "comments": f"/comments/{resource_id}/attachments",
+        "notes": f"/notes/{resource_id}/attachments",
+        "tasks": f"/tasks/{resource_id}/attachments", 
+        "custom_fields": f"/custom_fields/{resource_id}/attachments",
+        "custom_field_values": f"/custom_field_values/{resource_id}/attachments"
+    }
+    
+    if resource_type not in endpoint_map:
+        return json.dumps({
+            "error": f"Unsupported resource type: {resource_type}. Supported: {list(endpoint_map.keys())}"
+        })
+    
+    endpoint = endpoint_map[resource_type]
+    data = {
+        "attachment": {
+            "file_url": file_url,
+            "content_type": content_type,
+            "file_name": file_name
+        }
+    }
+    
+    return await execute_rest_api(ctx, "POST", endpoint, data, "upload attachment")
+
+
+async def delete_attachment(attachment_id: str, ctx: Context = None) -> str:
+    """Remove file attachments (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/attachments/{attachment_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete attachment")
+
+
+# =============================================================================
+# REQUIREMENT MANAGEMENT TOOLS  
+# =============================================================================
+
+async def list_requirements(
+    project_id: Optional[str] = None,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List requirements for features (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Requirements require at least one filter
+    filters = {"active": True}  # Default to active requirements
+    if project_id:
+        filters["projectId"] = project_id
+    
+    query, variables = build_list_query("requirements", build_standard_fields("requirement"), filters, page, per_page)
+    return await execute_graphql_query(ctx, query, variables, "requirements", "list requirements")
+
+
+async def create_requirement(
+    name: str,
+    feature_id: str,
+    description: Optional[str] = None,
+    assigned_to_user_id: Optional[str] = None,
+    original_estimate: Optional[str] = None,
+    initial_estimate: Optional[str] = None,
+    position: Optional[int] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create requirements (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {"name": name},
+        {"description": description, "originalEstimate": original_estimate, 
+         "initialEstimate": initial_estimate, "position": position},
+        {"feature": feature_id, "assignedToUser": assigned_to_user_id}
+    )
+    
+    query = CrudTemplates.create_mutation("requirement", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"attrs": attributes}, "createRequirement", "requirement", "create requirement")
+
+
+async def update_requirement(
+    id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    assigned_to_user_id: Optional[str] = None,
+    original_estimate: Optional[str] = None,
+    remaining_estimate: Optional[str] = None,
+    initial_estimate: Optional[str] = None,
+    work_done: Optional[str] = None,
+    workflow_status_id: Optional[str] = None,
+    position: Optional[int] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Modify requirements (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    attributes = build_attributes(
+        {},
+        {"name": name, "description": description, "originalEstimate": original_estimate,
+         "remainingEstimate": remaining_estimate, "initialEstimate": initial_estimate,
+         "workDone": work_done, "position": position},
+        {"workflowStatus": workflow_status_id, "assignedToUser": assigned_to_user_id}
+    )
+    
+    query = CrudTemplates.update_mutation("requirement", ["id", "referenceNum", "name"])
+    return await execute_mutation(ctx, query, {"id": id, "attrs": attributes}, "updateRequirement", "requirement", "update requirement")
+
+
+async def delete_requirement(id: str, ctx: Optional[Context] = None) -> str:
+    """Remove requirements (GraphQL available)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    query = CrudTemplates.delete_mutation("requirement")
+    return await execute_mutation(ctx, query, {"id": id}, "deleteRequirement", "requirement", "delete requirement")
+
+
+# =============================================================================
+# WORKFLOW AND METADATA TOOLS  
+# =============================================================================
+
+async def list_workflows(
+    project_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get available workflows (REST preferred)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/products/{project_id}/workflows"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list workflows")
+
+
+async def list_custom_fields(ctx: Optional[Context] = None) -> str:
+    """Get custom field definitions (REST preferred)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = "/custom_field_definitions"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list custom fields")
+
+
+async def duplicate_release(
+    id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Copy release structure (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/releases/{id}/duplicate"
+    return await execute_rest_api(ctx, "POST", endpoint, operation="duplicate release")
+
+
+async def list_users(
+    project_id: Optional[str] = None,
+    email: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get workspace users (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    if project_id:
+        # List users for specific project
+        endpoint = f"/products/{project_id}/users"
+    else:
+        # List all users with optional email filter
+        endpoint = "/users"
+        if email:
+            endpoint += f"?email={email}"
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list users")
+
+
+async def create_user(
+    project_id: str,
+    email: str,
+    first_name: str,
+    last_name: str,
+    role: str,
+    identity_provider_id: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Add new users (REST only)"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate role
+    valid_roles = ["product_owner", "contributor", "reviewer", "viewer", "none"]
+    if role not in valid_roles:
+        return json.dumps({
+            "error": f"Invalid role: {role}. Must be one of: {', '.join(valid_roles)}"
+        })
+    
+    endpoint = f"/products/{project_id}/users"
+    data = {
+        "user": {
+            "email": email,
+            "first_name": first_name,
+            "last_name": last_name,
+            "role": role
+        }
+    }
+    
+    if identity_provider_id:
+        data["user"]["identity_provider_id"] = identity_provider_id
+    
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create user")
