@@ -1,205 +1,122 @@
-# Aha! MCP Server - Complete Implementation ✅
+# Aha! MCP Server - TODO
 
-## 🎉 FINAL STATUS: ALL 35 TOOLS SUCCESSFULLY IMPLEMENTED AND TESTED! 
+## Current Status: 35/120+ Tools Implemented ✅
 
-### ✅ COMPREHENSIVE ACHIEVEMENT SUMMARY (2025-07-20)
+**Phase 1 Complete:** Core functionality (35 tools) across features, ideas, epics, initiatives, releases, goals, requirements, comments, users, attachments, and workflows.
 
-**Final Results:**
-- ✅ **High Priority**: 20/20 tools complete and tested
-- ✅ **Medium Priority**: 6/6 tools complete and tested  
-- ✅ **Lower Priority**: 9/9 tools complete and tested
-- ✅ **Testing Coverage**: 35/35 tools verified working
-- ✅ **Tag Categorization**: All tools organized with functional tags
+### High Priority Implementation Checklist (45+ tools)
 
-### 🚀 Key Technical Achievements
+#### To-dos/Tasks (7 tools) - Essential workflow management
+- [ ] `create_task` - Create tasks associated with features/ideas
+- [ ] `list_tasks` - List tasks by assignee or record  
+- [ ] `get_task` - Get task details
+- [ ] `update_task` - Update task properties/status
+- [ ] `delete_task` - Delete tasks
+- [ ] `complete_task` - Mark tasks complete/incomplete
+- [ ] `list_tasks_for_record` - Get tasks for specific records
 
-1. **Hybrid API Integration**: Successfully combined GraphQL and REST APIs
-   - GraphQL for core CRUD operations and queries
-   - REST API for specialized operations (scoring, tagging, attachments, user management)
+#### Key Results (6 tools) - OKR tracking
+- [ ] `list_key_results` - List key results for goals
+- [ ] `create_key_result` - Create key results
+- [ ] `get_key_result` - Get key result details  
+- [ ] `update_key_result` - Update metrics/status
+- [ ] `delete_key_result` - Remove key results
+- [ ] `update_key_result_progress` - Update current progress
 
-2. **Comprehensive Error Handling**: 
-   - GraphQL schema introspection for field validation
-   - REST API documentation-driven implementation
-   - Proper error messages and fallback strategies
+#### Record Links/Dependencies (5 tools) - Dependency management
+- [ ] `list_record_links` - List dependencies between records
+- [ ] `create_record_link` - Create dependency relationships
+- [ ] `get_record_link` - Get link details
+- [ ] `delete_record_link` - Remove dependencies
+- [ ] `list_record_links_for_type` - Get links by record type
 
-3. **Advanced Features**:
-   - Client-side pagination simulation for non-paginated GraphQL fields
-   - Scorecard structure preservation for idea scoring
-   - Tag management with comma-separated string format
-   - File attachment handling via REST endpoints
+#### Products/Workspaces (2 tools) - Workspace management
+- [ ] `list_products` - List products in account
+- [ ] `get_product` - Get product details
 
-4. **MCP Protocol Compliance**:
-   - All 35 tools properly registered with FastMCP 2.0
-   - Comprehensive categorization tags for tool organization
-   - Consistent parameter typing and documentation
+#### Release Phases (5 tools) - Release milestone management
+- [ ] `list_release_phases` - List phases for releases
+- [ ] `create_release_phase` - Create release milestones/phases
+- [ ] `get_release_phase` - Get phase details
+- [ ] `update_release_phase` - Update phase dates/status
+- [ ] `delete_release_phase` - Remove phases
 
-### 📊 Tool Categories Implemented
+#### Idea Votes (6 tools) - Idea engagement tracking
+- [ ] `create_idea_vote` - Create votes for ideas
+- [ ] `list_idea_votes` - List votes for ideas  
+- [ ] `get_idea_vote` - Get vote details
+- [ ] `update_idea_vote` - Modify vote values
+- [ ] `delete_idea_vote` - Remove votes
+- [ ] `create_proxy_vote` - Create proxy votes for portal users
 
-**By Resource Type:**
-- Features (7 tools), Ideas (8 tools), Epics (4 tools), Initiatives (4 tools)
-- Releases (5 tools), Goals (4 tools), Requirements (4 tools), Comments (4 tools)  
-- Users (2 tools), Attachments (2 tools), Workflows/Metadata (3 tools)
+#### Pages/Notes (4 tools) - Documentation management
+- [ ] `list_pages` - List pages/notes in products
+- [ ] `create_page` - Create documentation pages
+- [ ] `update_page` - Update page content
+- [ ] `delete_page` - Remove pages
 
-**By Operation Type:**
-- List/Query (11 tools), Create (10 tools), Update (9 tools), Delete (8 tools)
-- Search (2 tools), Special Operations (7 tools)
+#### Idea Portal Management (8 tools) - Portal administration
+- [ ] `list_idea_portals` - List idea portals
+- [ ] `list_idea_portal_users` - List portal users/contacts
+- [ ] `create_idea_portal_user` - Add portal users
+- [ ] `update_idea_portal_user` - Update user details
+- [ ] `list_idea_subscriptions` - List idea subscriptions
+- [ ] `create_idea_subscription` - Subscribe users to ideas
+- [ ] `delete_idea_subscription` - Remove subscriptions
+- [ ] `list_idea_categories` - List idea categories
 
-All tools are now production-ready with proper authentication, error handling, and comprehensive testing coverage.
+#### Strategic Elements (6 tools) - Strategy management
+- [ ] `list_strategic_models` - List strategy models
+- [ ] `get_strategic_model` - Get model details
+- [ ] `list_strategic_visions` - List strategic visions
+- [ ] `get_strategic_vision` - Get vision details
+- [ ] `list_strategic_positions` - List strategic positions
+- [ ] `get_strategic_position` - Get position details
 
-## REST API Integration for Extended Functionality
+#### Integration Management (4 tools) - External system integration
+- [ ] `list_integrations` - List configured integrations
+- [ ] `create_integration_field` - Map integration fields
+- [ ] `update_integration_field` - Update field mappings
+- [ ] `delete_integration_field` - Remove field mappings
 
-The Aha! GraphQL API has limitations for certain operations that are available through their REST API. The following features could be implemented by adding REST API support alongside the existing GraphQL implementation:
+**Total High Priority: 53 tools**
 
-### 1. Idea Score Updates
+### Medium Priority (20-35 additional tools)
 
-Currently, the GraphQL API doesn't support updating idea scores directly. Aha! uses a REST API for this:
+#### Teams Management (6 tools)
+- `list_teams`, `create_team`, `get_team`, `update_team`, `delete_team`, `list_team_members`
 
-- **Endpoint**: `PATCH https://{domain}.aha.io/ideas/ideas/{reference_num}`
-- **Example**: `PATCH https://caseys-company.use3.aha.io/ideas/ideas/DEMO-I-26`
-- **Request Body**:
-```json
-{
-  "ideas_idea": {
-    "score": "28",
-    "score_facts_attributes": [
-      {
-        "scoring_system_metric_id": "6001166983756125437",
-        "value": 28
-      },
-      {
-        "scoring_system_metric_id": "6001166988050612717",
-        "value": 0
-      }
-    ]
-  }
-}
-```
+#### Time Tracking (5 tools) - Project tracking
+- `create_time_entry` - Log work against records
+- `list_time_entries` - List time tracking events
+- `update_time_entry` - Modify time entries
+- `delete_time_entry` - Remove time entries  
+- `get_time_summary` - Get time summary for records
 
-**Implementation Notes**:
-- Need to discover how to get scoring_system_metric_ids
-- Score is sent as a string, not a number
-- score_facts_attributes appears to be an array of metric values
+#### Personas (4 tools)
+- `list_personas`, `create_persona`, `get_persona`, `update_persona`
 
-### 2. Tag Management
+#### Capacity Management (5 tools)
+- `list_capacity_investments`, `create_capacity_investment`, `get_capacity_investment`, `update_capacity_investment`, `delete_capacity_investment`
 
-Tags cannot be updated through GraphQL for ideas. Aha! uses a separate REST endpoint:
+### Low Priority (40+ additional tools)
 
-- **Endpoint**: `POST https://{domain}.aha.io/taggable/{numeric_id}/tags/set`
-- **Example**: `POST https://caseys-company.use3.aha.io/taggable/7528931497935092063/tags/set`
-- **Request Body**:
-```json
-[
-  {
-    "label": "test",
-    "value": "7528935782288118517"
-  }
-]
-```
+#### Advanced Features (6+ tools)
+- Competitors, creative briefs, custom tables
 
-**Implementation Notes**:
-- Uses the numeric ID of the idea, not the reference number
-- `value` is the tag ID (not the tag name)
-- `label` is the display name of the tag
-- Need to implement tag lookup/creation to get tag IDs
-
-### 3. Other Potential REST Endpoints to Investigate
-
-- **Description updates** - Ideas have descriptions through the Note system, but GraphQL doesn't expose update methods
-- **Visibility updates** - The visibility field exists but isn't updateable through GraphQL
-- **File attachments** - How to upload and attach files to ideas/features
-- **Custom field updates** - More complex custom field operations
-
-### 4. Implementation Approach
-
-To add REST API support:
-
-1. Add REST client alongside the existing GraphQL client
-2. Use the same authentication token for both APIs
-3. Create hybrid functions that use GraphQL for reads and REST for specific updates
-4. Maintain backward compatibility with existing function signatures
-5. Add configuration option to enable/disable REST API features
-
-### 5. Authentication Considerations
-
-- REST API uses the same Bearer token authentication as GraphQL
-- Need to handle both API token and OAuth token scenarios
-- May need to add proper error handling for REST-specific errors
-
-### 6. Testing Requirements
-
-- Need to test with different Aha! account types (some features may be plan-specific)
-- Verify REST endpoints are stable across Aha! updates
-- Test error handling for both authentication methods
-- Ensure REST operations don't break existing GraphQL functionality
+#### Administration (5+ tools)
+- Audits, backups, schedules, identity providers
 
 ## MCP Enhancements
 
-### 7. Add MCP Prompts
+### Add MCP Prompts
+- Feature management workflows
+- Idea processing workflows  
+- Project planning workflows
+- Reporting workflows
 
-Add predefined prompts to guide users in common Aha! workflows:
-
-- **Feature Management**: Prompts for creating, updating, and tracking features
-- **Idea Processing**: Prompts for reviewing, scoring, and promoting ideas
-- **Project Planning**: Prompts for release planning and roadmap management
-- **Reporting**: Prompts for generating reports and analytics
-
-### 8. Add MCP Resources
-
-Expose Aha! data as MCP resources for better integration:
-
-- **Active Releases**: List of current releases with their features
-- **Idea Backlog**: Pending ideas requiring review
-- **My Work**: Items assigned to the current user
-- **Recent Updates**: Recently modified items across the workspace
-
-### 9. Add More Aha! Endpoints
-
-#### GraphQL vs REST API Comparison
-
-Based on analysis of available GraphQL mutations and REST API endpoints, here's a comprehensive comparison:
-
-| Resource | GraphQL Mutations Available | REST API Endpoints | Implementation Notes |
-|----------|---------------------------|-------------------|---------------------|
-| **Features** | ✅ createFeature<br>✅ updateFeature<br>✅ deleteFeature | ✅ Full CRUD<br>✅ Convert to epic<br>✅ Tags, scores, watchers | GraphQL covers basic needs; REST adds conversion & metadata |
-| **Ideas** | ✅ createIdea<br>✅ updateIdea<br>✅ promoteIdea | ✅ Full CRUD<br>✅ Promote to feature/epic<br>❌ Score updates (REST only)<br>❌ Tags (REST only) | **REST needed for scores & tags** |
-| **Releases** | ✅ createRelease<br>✅ updateRelease<br>❌ deleteRelease | ✅ Full CRUD<br>✅ Duplicate release<br>✅ Sub-releases | GraphQL missing delete; REST has duplication |
-| **Epics** | ✅ createEpic<br>✅ updateEpic<br>✅ deleteEpic | ✅ Full CRUD<br>✅ Multiple parent contexts | GraphQL fully functional |
-| **Requirements** | ✅ createRequirement<br>✅ updateRequirement<br>✅ deleteRequirement | ✅ Full CRUD<br>✅ Convert to feature | GraphQL covers needs; REST adds conversion |
-| **Comments** | ✅ createComment<br>❌ updateComment<br>❌ deleteComment | ✅ Full CRUD on all resources | **GraphQL incomplete; REST needed** |
-| **Tasks/To-dos** | ✅ createTask<br>✅ updateTask<br>✅ deleteTask | ✅ Full CRUD | GraphQL fully functional |
-| **Goals** | ✅ createGoal<br>✅ updateGoal<br>❌ deleteGoal | ✅ Full CRUD | GraphQL missing delete |
-| **Initiatives** | ✅ createInitiative<br>✅ updateInitiative<br>❌ deleteInitiative | ✅ Full CRUD | GraphQL missing delete |
-| **Pages** | ✅ createPage<br>✅ updatePage<br>✅ deletePage<br>✅ createPageFromTemplate | ✅ Full CRUD | GraphQL fully functional with templates |
-| **Workflows** | ✅ createWorkflowStatus<br>✅ updateWorkflowStatus<br>✅ deleteWorkflowStatus | ✅ List workflows<br>✅ Get workflow details | GraphQL manages statuses; REST for workflow info |
-| **Custom Fields** | ✅ setCustomFieldValue | ✅ List definitions<br>✅ Get options<br>✅ Update values | GraphQL can set values; REST for metadata |
-| **Attachments** | ❌ No mutations | ✅ Create on various resources<br>✅ Delete | **REST only for file uploads** |
-| **Users** | ❌ No mutations | ✅ Full CRUD<br>✅ Role management | **REST only for user management** |
-| **Teams** | ✅ assignToTeam<br>✅ setWipLimits | ✅ Full CRUD | GraphQL for assignment; REST for team CRUD |
-| **Iterations** | ✅ createIteration<br>✅ updateIteration<br>✅ deleteIteration<br>✅ completeIteration | Not documented | GraphQL only (Agile features) |
-| **Record Links** | ✅ createRecordLink | ✅ Full CRUD | GraphQL can create; REST for full management |
-| **Bookmarks** | ✅ Multiple update mutations | Not documented | GraphQL only (UI features) |
-| **Extensions** | ✅ Multiple mutations | Not documented | GraphQL only (Platform features) |
-
-#### Priority Implementation Recommendations
-
-1. **High Priority (REST Required)**:
-   - **Idea Scores & Tags**: No GraphQL support
-   - **Attachments/File Uploads**: No GraphQL support
-   - **User Management**: No GraphQL support
-   - **Comments CRUD**: GraphQL only has create
-
-2. **Medium Priority (GraphQL Incomplete)**:
-   - **Release Delete**: Missing in GraphQL
-   - **Goal Delete**: Missing in GraphQL
-   - **Initiative Delete**: Missing in GraphQL
-   - **Comment Update/Delete**: Missing in GraphQL
-
-3. **Low Priority (GraphQL Sufficient)**:
-   - Features, Epics, Requirements, Tasks, Pages: Fully covered
-   - Iterations, Bookmarks, Extensions: GraphQL-only features
-
-4. **Nice to Have (REST Enhancements)**:
-   - Convert operations (feature→epic, requirement→feature)
-   - Duplicate release
-   - Bulk operations
-   - Advanced filtering/search
+### Add MCP Resources
+- Active releases with features
+- Idea backlog requiring review
+- My assigned work
+- Recent updates across workspace
