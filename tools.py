@@ -31,6 +31,7 @@ def register_tools(mcp_instance: FastMCP):
     mcp.tool(list_ideas)
     mcp.tool(update_idea)
     mcp.tool(delete_idea)
+    mcp.tool(list_projects)
     mcp.tool(introspection)
 
 
@@ -655,11 +656,76 @@ async def delete_idea(id: str, ctx: Context = None) -> str:
     if auth_error:
         return auth_error
     
-    # Note: This is a placeholder. Actual implementation would need REST API support
-    return json.dumps({
-        "error": "Delete idea is not supported via GraphQL API",
-        "note": "This operation requires REST API implementation"
-    })
+    try:
+        # Use REST API to delete the idea
+        endpoint = f"/ideas/{id}"
+        await rest_api(ctx, "DELETE", endpoint)
+        
+        return json.dumps({
+            "success": True,
+            "message": f"Idea {id} deleted successfully"
+        })
+    except Exception as e:
+        return json.dumps({
+            "error": f"Failed to delete idea {id}: {str(e)}"
+        })
+
+
+async def list_projects(
+    teams_only: Optional[bool] = None,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Context = None
+) -> str:
+    """List projects/workspaces in Aha!
+    
+    Args:
+        teams_only: If True, show only teams; if False, show only non-teams; if None, show all
+        page: Page number for pagination (default: 1)
+        per_page: Number of projects per page (default: 20, max: 100)
+    """
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Build filters
+    filters = {}
+    if teams_only is not None:
+        filters["teams"] = teams_only
+    
+    query = """query($filters: ProjectFilters, $page: Int!, $per: Int!) {
+        projects(filters: $filters, page: $page, per: $per) {
+            nodes {
+                id
+                name
+                description { htmlBody }
+                color
+                childrenCount
+                backlogManagementEnabled
+                epicsEnabled
+                defaultRelease { id referenceNum name }
+                defaultUser { id name email }
+                goalsCount
+                developTeamsCount
+                createdAt
+                updatedAt
+            }
+            currentPage
+            totalCount
+            totalPages
+            isLastPage
+        }
+    }"""
+    
+    try:
+        data = await graphql(ctx, query, {
+            "filters": filters,  # Always pass the filters object (empty if no filters)
+            "page": page,
+            "per": min(per_page, 100)  # Cap at 100 per page
+        })
+        return json.dumps(data.get("projects", {}), indent=2)
+    except Exception as e:
+        return json.dumps({"error": f"Failed to list projects: {str(e)}"}, indent=2)
 
 
 async def introspection(
