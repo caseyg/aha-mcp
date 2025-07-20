@@ -533,6 +533,86 @@ Performs GraphQL introspection to explore the Aha! API schema with size-limited 
 }
 ```
 
+## Available MCP Prompts
+
+The server provides several pre-defined prompts to help with common Aha! workflows:
+
+### 1. analyze_feature_backlog
+Generates a comprehensive prompt for analyzing your feature backlog.
+
+**Parameters:**
+- `project_id` (required): The project ID to analyze
+- `release_id` (optional): Specific release to focus on
+
+### 2. create_feature_spec
+Helps create a detailed feature specification ready for Aha!
+
+**Parameters:**
+- `feature_name` (required): Name of the feature
+- `release_id` (required): Target release ID
+- `user_story` (required): User story description
+- `acceptance_criteria` (optional): Acceptance criteria
+
+### 3. idea_evaluation
+Evaluates ideas in a project based on specified criteria.
+
+**Parameters:**
+- `project_id` (required): Project containing ideas
+- `evaluation_criteria` (optional): Criteria to evaluate (default: "value, effort, risk")
+
+### 4. release_planning
+Assists with release planning and capacity analysis.
+
+**Parameters:**
+- `release_id` (required): Release to plan
+- `team_capacity` (optional): Team capacity information
+- `focus_areas` (optional): Areas to focus on
+
+### 5. bug_triage_session
+Guides a bug triage session with severity and age filtering.
+
+**Parameters:**
+- `tag` (optional): Filter bugs by tag
+- `severity_threshold` (optional): Minimum severity (default: "high")
+- `age_days` (optional): Minimum age in days (default: 7)
+
+### 6. feature_dependencies_analysis
+Analyzes upstream and downstream dependencies for a feature.
+
+**Parameters:**
+- `feature_reference` (required): Feature to analyze
+- `check_upstream` (optional): Check what this depends on (default: true)
+- `check_downstream` (optional): Check what depends on this (default: true)
+
+### 7. sprint_retrospective
+Generates a comprehensive sprint retrospective analysis.
+
+**Parameters:**
+- `sprint_name` (required): Name of the sprint
+- `team_name` (optional): Specific team to focus on
+
+### 8. weekly_status_report
+Creates a structured weekly status report.
+
+**Parameters:**
+- `project_id` (required): Project to report on
+- `week_ending` (required): Week ending date
+- `include_metrics` (optional): Include metrics section (default: true)
+
+### 9. idea_to_feature_conversion
+Guides the conversion of an idea into a feature.
+
+**Parameters:**
+- `idea_reference` (required): Idea to convert
+- `target_release` (required): Target release for the feature
+
+### 10. integration_checklist
+Generates a comprehensive integration checklist.
+
+**Parameters:**
+- `feature_reference` (required): Feature requiring integration
+- `integration_type` (optional): Type of integration (default: "API")
+
 ## Example Queries
 
 - "Get feature DEVELOP-123"
