@@ -23,7 +23,8 @@ spec.loader.exec_module(aha_mcp)
 
 # Get the instances we need
 mcp = aha_mcp.mcp
-graphql = aha_mcp.graphql
+# Import graphql from client module
+from client import graphql
 
 
 # Test data - using DEMO project references
@@ -204,6 +205,59 @@ MOCK_INTROSPECTION_RESPONSE = {
     }
 }
 
+MOCK_LIST_PROJECTS_RESPONSE = {
+    "projects": {
+        "nodes": [
+            {
+                "id": "7528935782288118517",
+                "name": "Demo Workspace",
+                "description": {
+                    "htmlBody": "<p>Example workspace for testing</p>"
+                },
+                "color": "#FF5733",
+                "childrenCount": 3,
+                "backlogManagementEnabled": True,
+                "epicsEnabled": True,
+                "defaultRelease": {
+                    "id": "7528935782288118600",
+                    "referenceNum": "DEMO-R-1",
+                    "name": "Release 1.0"
+                },
+                "defaultUser": {
+                    "id": "12345",
+                    "name": "John Doe",
+                    "email": "john.doe@example.com"
+                },
+                "goalsCount": 5,
+                "developTeamsCount": 2,
+                "createdAt": "2024-01-01T00:00:00Z",
+                "updatedAt": "2024-12-01T00:00:00Z"
+            },
+            {
+                "id": "7528935782288118518",
+                "name": "Team Alpha",
+                "description": {
+                    "htmlBody": "<p>Development team workspace</p>"
+                },
+                "color": "#33C3F0",
+                "childrenCount": 1,
+                "backlogManagementEnabled": False,
+                "epicsEnabled": True,
+                "defaultRelease": None,
+                "defaultUser": None,
+                "goalsCount": 2,
+                "developTeamsCount": 1,
+                "createdAt": "2024-02-01T00:00:00Z",
+                "updatedAt": "2024-11-01T00:00:00Z"
+            }
+        ],
+        "currentPage": 1,
+        "totalCount": 2,
+        "totalPages": 1,
+        "isLastPage": True
+    }
+}
+
 @pytest.fixture
 def mock_env(monkeypatch):
     """Set up test environment variables"""
@@ -213,8 +267,8 @@ def mock_env(monkeypatch):
 @pytest_asyncio.fixture
 async def test_client(mock_env):
     """Create a test client with mocked GraphQL"""
-    # Note: We need to patch the graphql function on the imported module
-    with patch.object(aha_mcp, 'graphql', new_callable=AsyncMock) as mock_graphql:
+    # Patch the graphql function in the tools module since that's what the tools use
+    with patch('tools.graphql', new_callable=AsyncMock) as mock_graphql:
         async with Client(mcp) as client:
             # Set the mock on the client for tests to configure
             client.mock_graphql = mock_graphql
@@ -456,6 +510,77 @@ async def test_delete_idea(test_client):
         data = json.loads(result.data)
         assert data["success"] == True
         assert data["id"] == TEST_IDEA_ID
+
+# Test list projects
+@pytest.mark.asyncio
+async def test_list_projects_default(test_client):
+    """Test listing all projects with default parameters"""
+    test_client.mock_graphql.return_value = MOCK_LIST_PROJECTS_RESPONSE
+    
+    result = await test_client.call_tool("list_projects", {})
+    
+    assert json.loads(result.data) == MOCK_LIST_PROJECTS_RESPONSE["projects"]
+
+@pytest.mark.asyncio
+async def test_list_projects_teams_only(test_client):
+    """Test listing only team projects"""
+    test_client.mock_graphql.return_value = MOCK_LIST_PROJECTS_RESPONSE
+    
+    result = await test_client.call_tool("list_projects", {
+        "teams_only": True
+    })
+    
+    # Verify the GraphQL was called with correct filters
+    call_args = test_client.mock_graphql.call_args
+    variables = call_args[0][2]  # Third positional argument is variables
+    assert variables["filters"]["teams"] == True
+    assert json.loads(result.data) == MOCK_LIST_PROJECTS_RESPONSE["projects"]
+
+@pytest.mark.asyncio
+async def test_list_projects_non_teams_only(test_client):
+    """Test listing only non-team projects"""
+    test_client.mock_graphql.return_value = MOCK_LIST_PROJECTS_RESPONSE
+    
+    result = await test_client.call_tool("list_projects", {
+        "teams_only": False
+    })
+    
+    # Verify the GraphQL was called with correct filters
+    call_args = test_client.mock_graphql.call_args
+    variables = call_args[0][2]  # Third positional argument is variables
+    assert variables["filters"]["teams"] == False
+    assert json.loads(result.data) == MOCK_LIST_PROJECTS_RESPONSE["projects"]
+
+@pytest.mark.asyncio
+async def test_list_projects_pagination(test_client):
+    """Test list projects with pagination parameters"""
+    test_client.mock_graphql.return_value = MOCK_LIST_PROJECTS_RESPONSE
+    
+    result = await test_client.call_tool("list_projects", {
+        "page": 2,
+        "per_page": 50
+    })
+    
+    # Verify the GraphQL was called with correct pagination params
+    call_args = test_client.mock_graphql.call_args
+    variables = call_args[0][2]  # Third positional argument is variables
+    assert variables["page"] == 2
+    assert variables["per"] == 50
+    assert json.loads(result.data) == MOCK_LIST_PROJECTS_RESPONSE["projects"]
+
+@pytest.mark.asyncio
+async def test_list_projects_per_page_limit(test_client):
+    """Test list projects with per_page limit enforced"""
+    test_client.mock_graphql.return_value = MOCK_LIST_PROJECTS_RESPONSE
+    
+    result = await test_client.call_tool("list_projects", {
+        "per_page": 150  # Should be capped at 100
+    })
+    
+    # Verify the GraphQL was called with capped per_page
+    call_args = test_client.mock_graphql.call_args
+    variables = call_args[0][2]  # Third positional argument is variables
+    assert variables["per"] == 100  # Should be capped at 100
 
 # Test introspection
 @pytest.mark.asyncio
