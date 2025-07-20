@@ -121,8 +121,27 @@
 - Project planning workflows
 - Reporting workflows
 
-### Add MCP Resources
+### Add MCP Resources (WIP - In Progress)
 - Active releases with features
 - Idea backlog requiring review
 - My assigned work
 - Recent updates across workspace
+
+#### Implementation Status
+✅ Created resources.py with 4 resource implementations
+✅ Resources use parameterized URIs as required by FastMCP 2.0:
+  - `aha://releases/{status}` - Get releases by status (active, all, parking-lot)
+  - `aha://ideas/{filter}` - Get ideas by filter (review, new, all)
+  - `aha://work/{user_email}` - Get assigned work for a user
+  - `aha://updates/{days}` - Get recent updates (days back)
+
+⚠️ **Known Issues:**
+1. Resources not appearing in Claude @ mentions - needs investigation
+2. FastMCP requires all resources to have URI parameters (no static URIs)
+3. Resources are registered using @mcp.resource decorator pattern
+
+#### Next Steps to Complete:
+1. Debug why resources aren't showing in Claude interface
+2. Test resource functionality once visible
+3. Consider adding more resource types based on user needs
+4. Add resource caching for performance optimization
