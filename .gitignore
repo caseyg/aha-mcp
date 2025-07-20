@@ -4,4 +4,5 @@ node_modules
 .DS_Store
 __pycache__
 .coverage
-docs/fastmcp/
+docs
+*.bak

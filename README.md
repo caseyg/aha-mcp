@@ -4,6 +4,17 @@ A Python implementation of a Model Context Protocol (MCP) server for accessing A
 
 This implementation is based on the [original TypeScript MCP server by Aha!](https://github.com/aha-develop/aha-mcp) but has been rewritten in Python using the FastMCP framework, providing enhanced functionality including OAuth support, testing, and additional MCP tools.
 
+## Project Structure
+
+The codebase is organized into modular files for better maintainability:
+
+- `aha_mcp.py` - Main entry point that sets up the FastMCP server
+- `client.py` - GraphQL client and authentication handling
+- `tools.py` - All MCP tools for interacting with Aha! API
+- `prompts.py` - Pre-defined MCP prompts for common workflows
+- `oauth.py` - OAuth endpoints and discovery routes
+- `test_aha_mcp.py` - Comprehensive test suite
+
 ## Quick Start
 
 ### Prerequisites
