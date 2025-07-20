@@ -95,6 +95,79 @@ def register_tools(mcp_instance: FastMCP):
     mcp.tool(get_all_tags, tags={"tags", "metadata"})
     mcp.tool(list_workflows, tags={"workflows", "metadata"})
     mcp.tool(list_custom_fields, tags={"custom-fields", "metadata"})
+    
+    # Task/To-dos management tools
+    mcp.tool(create_task, tags={"tasks", "create"})
+    mcp.tool(list_tasks, tags={"tasks", "list"})
+    mcp.tool(get_task, tags={"tasks", "details"})
+    mcp.tool(update_task, tags={"tasks", "update"})
+    mcp.tool(delete_task, tags={"tasks", "delete"})
+    mcp.tool(complete_task, tags={"tasks", "complete"})
+    mcp.tool(list_tasks_for_record, tags={"tasks", "list", "records"})
+    
+    # Key Results management tools
+    mcp.tool(list_key_results, tags={"key-results", "list"})
+    mcp.tool(create_key_result, tags={"key-results", "create"})
+    mcp.tool(get_key_result, tags={"key-results", "details"})
+    mcp.tool(update_key_result, tags={"key-results", "update"})
+    mcp.tool(delete_key_result, tags={"key-results", "delete"})
+    mcp.tool(update_key_result_progress, tags={"key-results", "progress"})
+    
+    # Record Links/Dependencies management tools
+    mcp.tool(list_record_links, tags={"record-links", "dependencies", "list"})
+    mcp.tool(create_record_link, tags={"record-links", "dependencies", "create"})
+    mcp.tool(get_record_link, tags={"record-links", "dependencies", "details"})
+    mcp.tool(delete_record_link, tags={"record-links", "dependencies", "delete"})
+    mcp.tool(list_record_links_for_type, tags={"record-links", "dependencies", "list"})
+    
+    # Products/Workspaces management tools
+    mcp.tool(list_products, tags={"products", "workspaces", "list"})
+    mcp.tool(get_product, tags={"products", "workspaces", "details"})
+    
+    # Release Phases management tools
+    mcp.tool(list_release_phases, tags={"release-phases", "releases", "list"})
+    mcp.tool(create_release_phase, tags={"release-phases", "releases", "create"})
+    mcp.tool(get_release_phase, tags={"release-phases", "releases", "details"})
+    mcp.tool(update_release_phase, tags={"release-phases", "releases", "update"})
+    mcp.tool(delete_release_phase, tags={"release-phases", "releases", "delete"})
+    
+    # Idea Votes management tools
+    mcp.tool(create_idea_vote, tags={"idea-votes", "ideas", "create"})
+    mcp.tool(list_idea_votes, tags={"idea-votes", "ideas", "list"})
+    mcp.tool(get_idea_vote, tags={"idea-votes", "ideas", "details"})
+    mcp.tool(update_idea_vote, tags={"idea-votes", "ideas", "update"})
+    mcp.tool(delete_idea_vote, tags={"idea-votes", "ideas", "delete"})
+    mcp.tool(create_proxy_vote, tags={"idea-votes", "ideas", "proxy"})
+    
+    # Pages/Notes management tools
+    mcp.tool(list_pages, tags={"pages", "notes", "documentation", "list"})
+    mcp.tool(create_page, tags={"pages", "notes", "documentation", "create"})
+    mcp.tool(update_page, tags={"pages", "notes", "documentation", "update"})
+    mcp.tool(delete_page, tags={"pages", "notes", "documentation", "delete"})
+    
+    # Idea Portal Management tools
+    mcp.tool(list_idea_portals, tags={"ideas", "idea-portals", "portals", "list"})
+    mcp.tool(list_idea_portal_users, tags={"ideas", "idea-portals", "portal-users", "list"})
+    mcp.tool(create_idea_portal_user, tags={"ideas", "idea-portals", "portal-users", "create"})
+    mcp.tool(update_idea_portal_user, tags={"ideas", "idea-portals", "portal-users", "update"})
+    mcp.tool(list_idea_subscriptions, tags={"ideas", "idea-subscriptions", "list"})
+    mcp.tool(create_idea_subscription, tags={"ideas", "idea-subscriptions", "create"})
+    mcp.tool(delete_idea_subscription, tags={"ideas", "idea-subscriptions", "delete"})
+    mcp.tool(list_idea_categories, tags={"ideas", "idea-categories", "list"})
+    
+    # Strategic Elements management tools
+    mcp.tool(list_strategic_models, tags={"strategy", "strategic-models", "list"})
+    mcp.tool(get_strategic_model, tags={"strategy", "strategic-models", "details"})
+    mcp.tool(list_strategic_visions, tags={"strategy", "strategic-visions", "list"})
+    mcp.tool(get_strategic_vision, tags={"strategy", "strategic-visions", "details"})
+    mcp.tool(list_strategic_positions, tags={"strategy", "strategic-positions", "list"})
+    mcp.tool(get_strategic_position, tags={"strategy", "strategic-positions", "details"})
+    
+    # Integration Management tools
+    mcp.tool(list_integrations, tags={"integrations", "external-systems", "list"})
+    mcp.tool(create_integration_field, tags={"integrations", "integration-fields", "create"})
+    mcp.tool(update_integration_field, tags={"integrations", "integration-fields", "update"})
+    mcp.tool(delete_integration_field, tags={"integrations", "integration-fields", "delete"})
 
 
 async def get_record(reference: str, ctx: Context = None) -> str:
@@ -1699,3 +1772,1235 @@ async def create_user(
         data["user"]["identity_provider_id"] = identity_provider_id
     
     return await execute_rest_api(ctx, "POST", endpoint, data, "create user")
+
+
+# Task/To-dos management tools
+
+async def create_task(
+    record_type: str,
+    record_id: str,
+    name: str,
+    description: Optional[str] = None,
+    due_date: Optional[str] = None,
+    assigned_to_user_email: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create tasks associated with features/ideas"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate record type
+    valid_types = ["features", "epics", "initiatives", "releases", "requirements", "ideas"]
+    if record_type not in valid_types:
+        return json.dumps({
+            "error": f"Invalid record_type: {record_type}. Must be one of: {', '.join(valid_types)}"
+        })
+    
+    endpoint = f"/{record_type}/{record_id}/tasks"
+    data = {
+        "task": {
+            "name": name
+        }
+    }
+    
+    if description:
+        data["task"]["description"] = description
+    if due_date:
+        data["task"]["due_date"] = due_date
+    if assigned_to_user_email:
+        data["task"]["assigned_to_user"] = {"email": assigned_to_user_email}
+    
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create task")
+
+
+async def list_tasks(
+    assigned_to_user_id: Optional[str] = None,
+    completed: Optional[bool] = None,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List tasks by assignee or record"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = "/tasks"
+    params = []
+    
+    if assigned_to_user_id:
+        params.append(f"assigned_to_user_id={assigned_to_user_id}")
+    if completed is not None:
+        params.append(f"completed={str(completed).lower()}")
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list tasks")
+
+
+async def get_task(
+    task_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get task details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/tasks/{task_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get task")
+
+
+async def update_task(
+    task_id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    due_date: Optional[str] = None,
+    assigned_to_user_email: Optional[str] = None,
+    completed: Optional[bool] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Update task properties/status"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {"task": {}}
+    
+    if name:
+        data["task"]["name"] = name
+    if description:
+        data["task"]["description"] = description
+    if due_date:
+        data["task"]["due_date"] = due_date
+    if assigned_to_user_email:
+        data["task"]["assigned_to_user"] = {"email": assigned_to_user_email}
+    if completed is not None:
+        data["task"]["completed"] = completed
+    
+    if not data["task"]:
+        return json.dumps({"error": "No fields provided to update"})
+    
+    endpoint = f"/tasks/{task_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update task")
+
+
+async def delete_task(
+    task_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Delete tasks"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/tasks/{task_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete task")
+
+
+async def complete_task(
+    task_id: str,
+    completed: bool = True,
+    ctx: Optional[Context] = None
+) -> str:
+    """Mark tasks complete/incomplete"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {
+        "task": {
+            "completed": completed
+        }
+    }
+    
+    endpoint = f"/tasks/{task_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "complete task")
+
+
+async def list_tasks_for_record(
+    record_type: str,
+    record_id: str,
+    assigned_to_user_id: Optional[str] = None,
+    completed: Optional[bool] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get tasks for specific records"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate record type
+    valid_types = ["features", "epics", "initiatives", "releases", "requirements", "ideas"]
+    if record_type not in valid_types:
+        return json.dumps({
+            "error": f"Invalid record_type: {record_type}. Must be one of: {', '.join(valid_types)}"
+        })
+    
+    endpoint = f"/{record_type}/{record_id}/tasks"
+    params = []
+    
+    if assigned_to_user_id:
+        params.append(f"assigned_to_user_id={assigned_to_user_id}")
+    if completed is not None:
+        params.append(f"completed={str(completed).lower()}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list tasks for record")
+
+
+# Key Results management tools
+
+async def list_key_results(
+    goal_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """List key results for goals"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/goals/{goal_id}/key_results"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list key results")
+
+
+async def create_key_result(
+    goal_id: str,
+    name: str,
+    description: Optional[str] = None,
+    target_metric: Optional[str] = None,
+    starting_metric: Optional[str] = None,
+    assigned_to_user_email: Optional[str] = None,
+    workflow_status_name: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create key results"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {
+        "key_result": {
+            "name": name
+        }
+    }
+    
+    if description:
+        data["key_result"]["description"] = description
+    if target_metric:
+        data["key_result"]["target_metric"] = target_metric
+    if starting_metric:
+        data["key_result"]["starting_metric"] = starting_metric
+    if assigned_to_user_email:
+        data["key_result"]["assigned_to_user"] = {"email": assigned_to_user_email}
+    if workflow_status_name:
+        data["key_result"]["workflow_status"] = {"name": workflow_status_name}
+    
+    endpoint = f"/goals/{goal_id}/key_results"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create key result")
+
+
+async def get_key_result(
+    key_result_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get key result details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/key_results/{key_result_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get key result")
+
+
+async def update_key_result(
+    key_result_id: str,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    target_metric: Optional[str] = None,
+    starting_metric: Optional[str] = None,
+    current_metric: Optional[str] = None,
+    assigned_to_user_email: Optional[str] = None,
+    workflow_status_name: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Update metrics/status"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {"key_result": {}}
+    
+    if name:
+        data["key_result"]["name"] = name
+    if description:
+        data["key_result"]["description"] = description
+    if target_metric:
+        data["key_result"]["target_metric"] = target_metric
+    if starting_metric:
+        data["key_result"]["starting_metric"] = starting_metric
+    if current_metric:
+        data["key_result"]["current_metric"] = current_metric
+    if assigned_to_user_email:
+        data["key_result"]["assigned_to_user"] = {"email": assigned_to_user_email}
+    if workflow_status_name:
+        data["key_result"]["workflow_status"] = {"name": workflow_status_name}
+    
+    if not data["key_result"]:
+        return json.dumps({"error": "No fields provided to update"})
+    
+    endpoint = f"/key_results/{key_result_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update key result")
+
+
+async def delete_key_result(
+    key_result_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Remove key results"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/key_results/{key_result_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete key result")
+
+
+async def update_key_result_progress(
+    key_result_id: str,
+    current_metric: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Update current progress"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {
+        "key_result": {
+            "current_metric": current_metric
+        }
+    }
+    
+    endpoint = f"/key_results/{key_result_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update key result progress")
+
+
+# Record Links/Dependencies management tools
+
+async def list_record_links(
+    record_type: str,
+    record_id: str,
+    parent_and_child_links: bool = False,
+    ctx: Optional[Context] = None
+) -> str:
+    """List dependencies between records"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate record type
+    valid_types = ["features", "releases", "ideas", "epics", "release_phases", "initiatives", "pages", "goals"]
+    if record_type not in valid_types:
+        return json.dumps({
+            "error": f"Invalid record_type: {record_type}. Must be one of: {', '.join(valid_types)}"
+        })
+    
+    endpoint = f"/{record_type}/{record_id}/record_links"
+    if parent_and_child_links:
+        endpoint += "?parent_and_child_links=true"
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list record links")
+
+
+async def create_record_link(
+    parent_record_type: str,
+    parent_record_id: str,
+    child_record_type: str,
+    child_record_id: str,
+    link_type: int,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create dependency relationships"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate record types
+    valid_types = ["feature", "release", "idea", "epic", "release_phase", "initiative", "page", "goal"]
+    if parent_record_type not in valid_types:
+        return json.dumps({
+            "error": f"Invalid parent_record_type: {parent_record_type}. Must be one of: {', '.join(valid_types)}"
+        })
+    if child_record_type not in valid_types:
+        return json.dumps({
+            "error": f"Invalid child_record_type: {child_record_type}. Must be one of: {', '.join(valid_types)}"
+        })
+    
+    # Validate link type
+    valid_link_types = [10, 20, 30, 40, 50, 60, 80]
+    link_type_names = {
+        10: "Relates to",
+        20: "Depends on", 
+        30: "Duplicated by",
+        40: "Contained by",
+        50: "Impacted by",
+        60: "Blocked by",
+        80: "Research for"
+    }
+    
+    if link_type not in valid_link_types:
+        return json.dumps({
+            "error": f"Invalid link_type: {link_type}. Must be one of: {valid_link_types} ({', '.join(f'{k} ({v})' for k, v in link_type_names.items())})"
+        })
+    
+    data = {
+        "record_link": {
+            "record_type": child_record_type,
+            "record_id": child_record_id,
+            "link_type": link_type
+        }
+    }
+    
+    # Use plural form for endpoint
+    parent_type_plural = parent_record_type + "s" if not parent_record_type.endswith("s") else parent_record_type
+    endpoint = f"/{parent_type_plural}/{parent_record_id}/record_links"
+    
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create record link")
+
+
+async def get_record_link(
+    record_link_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get link details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/record_links/{record_link_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get record link")
+
+
+async def delete_record_link(
+    record_link_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Remove dependencies"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/record_links/{record_link_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete record link")
+
+
+async def list_record_links_for_type(
+    record_type: str,
+    link_type: Optional[int] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get links by record type"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # This is a conceptual endpoint - may need to be implemented differently
+    # based on actual Aha! API capabilities
+    endpoint = "/record_links"
+    params = [f"record_type={record_type}"]
+    
+    if link_type:
+        params.append(f"link_type={link_type}")
+    
+    endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list record links for type")
+
+
+# Products/Workspaces management tools
+
+async def list_products(
+    updated_since: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """List products in account"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = "/products"
+    params = []
+    
+    if updated_since:
+        params.append(f"updated_since={updated_since}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list products")
+
+
+async def get_product(
+    product_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get product details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/products/{product_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get product")
+
+
+# Release Phases management tools
+
+async def list_release_phases(
+    release_id: str,
+    phase_type: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """List phases for releases"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate phase type
+    if phase_type and phase_type not in ["milestone", "phase"]:
+        return json.dumps({
+            "error": f"Invalid phase_type: {phase_type}. Must be 'milestone' or 'phase'"
+        })
+    
+    endpoint = f"/releases/{release_id}/release_phases"
+    if phase_type:
+        endpoint += f"?type={phase_type}"
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list release phases")
+
+
+async def create_release_phase(
+    release_id: str,
+    name: str,
+    phase_type: str = "phase",
+    start_on: Optional[str] = None,
+    end_on: Optional[str] = None,
+    description: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create release milestones/phases"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate phase type
+    if phase_type not in ["milestone", "phase"]:
+        return json.dumps({
+            "error": f"Invalid phase_type: {phase_type}. Must be 'milestone' or 'phase'"
+        })
+    
+    data = {
+        "release_phase": {
+            "name": name,
+            "type": phase_type,
+            "release_id": release_id
+        }
+    }
+    
+    if start_on:
+        data["release_phase"]["start_on"] = start_on
+    if end_on:
+        data["release_phase"]["end_on"] = end_on
+    if description:
+        data["release_phase"]["description"] = description
+    
+    endpoint = "/release_phases"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create release phase")
+
+
+async def get_release_phase(
+    phase_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get phase details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/release_phases/{phase_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get release phase")
+
+
+async def update_release_phase(
+    phase_id: str,
+    name: Optional[str] = None,
+    start_on: Optional[str] = None,
+    end_on: Optional[str] = None,
+    description: Optional[str] = None,
+    progress: Optional[float] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Update phase dates/status"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {"release_phase": {}}
+    
+    if name:
+        data["release_phase"]["name"] = name
+    if start_on:
+        data["release_phase"]["start_on"] = start_on
+    if end_on:
+        data["release_phase"]["end_on"] = end_on
+    if description:
+        data["release_phase"]["description"] = description
+    if progress is not None:
+        data["release_phase"]["progress"] = progress
+    
+    if not data["release_phase"]:
+        return json.dumps({"error": "No fields provided to update"})
+    
+    endpoint = f"/release_phases/{phase_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update release phase")
+
+
+async def delete_release_phase(
+    phase_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Remove phases"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/release_phases/{phase_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete release phase")
+
+
+# Idea Votes management tools (using endorsements API)
+
+async def create_idea_vote(
+    idea_id: str,
+    value: Optional[float] = None,
+    user_email: Optional[str] = None,
+    description: Optional[str] = None,
+    link: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create votes for ideas"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {
+        "idea_endorsement": {}
+    }
+    
+    if user_email:
+        data["idea_endorsement"]["email"] = user_email
+    if value is not None:
+        data["idea_endorsement"]["value"] = value
+    if description:
+        data["idea_endorsement"]["description"] = description
+    if link:
+        data["idea_endorsement"]["link"] = link
+    
+    endpoint = f"/ideas/{idea_id}/endorsements"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create idea vote")
+
+
+async def list_idea_votes(
+    idea_id: str,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List votes for ideas"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/ideas/{idea_id}/endorsements"
+    params = []
+    
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list idea votes")
+
+
+async def get_idea_vote(
+    idea_id: str,
+    vote_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get vote details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/ideas/{idea_id}/endorsements/{vote_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get idea vote")
+
+
+async def update_idea_vote(
+    idea_id: str,
+    vote_id: str,
+    value: Optional[float] = None,
+    description: Optional[str] = None,
+    link: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Modify vote values"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {"idea_endorsement": {}}
+    
+    if value is not None:
+        data["idea_endorsement"]["value"] = value
+    if description:
+        data["idea_endorsement"]["description"] = description
+    if link:
+        data["idea_endorsement"]["link"] = link
+    
+    if not data["idea_endorsement"]:
+        return json.dumps({"error": "No fields provided to update"})
+    
+    endpoint = f"/ideas/{idea_id}/endorsements/{vote_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update idea vote")
+
+
+async def delete_idea_vote(
+    idea_id: str,
+    vote_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Remove votes"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/ideas/{idea_id}/endorsements/{vote_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete idea vote")
+
+
+async def create_proxy_vote(
+    idea_id: str,
+    value: float,
+    voter_emails: List[str],
+    description: Optional[str] = None,
+    link: Optional[str] = None,
+    idea_organization_id: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create proxy votes for portal users"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {
+        "idea_endorsement": {
+            "idea_id": idea_id,
+            "value": value,
+            "idea_users": voter_emails
+        }
+    }
+    
+    if description:
+        data["idea_endorsement"]["description"] = description
+    if link:
+        data["idea_endorsement"]["link"] = link
+    if idea_organization_id:
+        data["idea_endorsement"]["idea_organization_id"] = idea_organization_id
+    
+    endpoint = f"/ideas/{idea_id}/endorsements"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create proxy vote")
+
+
+# Pages/Notes management tools
+
+async def list_pages(
+    product_id: str,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List pages/notes in products"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/products/{product_id}/pages"
+    params = []
+    
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list pages")
+
+
+async def create_page(
+    product_id: str,
+    name: str,
+    body: Optional[str] = None,
+    page_type: str = "page",
+    parent_id: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Create documentation pages"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate page type
+    valid_types = ["page", "note", "whiteboard"]
+    if page_type not in valid_types:
+        return json.dumps({
+            "error": f"Invalid page_type: {page_type}. Must be one of: {', '.join(valid_types)}"
+        })
+    
+    data = {
+        "page": {
+            "name": name,
+            "type": page_type
+        }
+    }
+    
+    if body:
+        data["page"]["body"] = body
+    if parent_id:
+        data["page"]["parent_id"] = parent_id
+    
+    endpoint = f"/products/{product_id}/pages"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create page")
+
+
+async def update_page(
+    page_id: str,
+    name: Optional[str] = None,
+    body: Optional[str] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Update page content"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {"page": {}}
+    
+    if name:
+        data["page"]["name"] = name
+    if body:
+        data["page"]["body"] = body
+    
+    if not data["page"]:
+        return json.dumps({"error": "No fields provided to update"})
+    
+    endpoint = f"/pages/{page_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update page")
+
+
+async def delete_page(
+    page_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Remove pages"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/pages/{page_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete page")
+
+
+# Idea Portal Management tools
+
+async def list_idea_portals(
+    product_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """List idea portals"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/products/{product_id}/idea_portals"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list idea portals")
+
+
+async def list_idea_portal_users(
+    idea_portal_id: str,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List portal users/contacts"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/idea_portals/{idea_portal_id}/portal_users"
+    params = []
+    
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list idea portal users")
+
+
+async def create_idea_portal_user(
+    idea_portal_id: str,
+    email: str,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    permission: Optional[str] = None,
+    enabled: Optional[bool] = None,
+    max_endorsement_override: Optional[int] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Add portal users"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate permission
+    if permission and permission not in ["employee", "customer"]:
+        return json.dumps({
+            "error": f"Invalid permission: {permission}. Must be 'employee' or 'customer'"
+        })
+    
+    data = {
+        "portal_user": {
+            "email": email
+        }
+    }
+    
+    if first_name:
+        data["portal_user"]["first_name"] = first_name
+    if last_name:
+        data["portal_user"]["last_name"] = last_name
+    if permission:
+        data["portal_user"]["permission"] = permission
+    if enabled is not None:
+        data["portal_user"]["enabled"] = enabled
+    if max_endorsement_override is not None:
+        data["portal_user"]["max_endorsement_override"] = max_endorsement_override
+    
+    endpoint = f"/idea_portals/{idea_portal_id}/portal_users"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create idea portal user")
+
+
+async def update_idea_portal_user(
+    idea_portal_id: str,
+    user_id: str,
+    first_name: Optional[str] = None,
+    last_name: Optional[str] = None,
+    enabled: Optional[bool] = None,
+    max_endorsement_override: Optional[int] = None,
+    unsubscribed: Optional[bool] = None,
+    ctx: Optional[Context] = None
+) -> str:
+    """Update user details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {"portal_user": {}}
+    
+    if first_name:
+        data["portal_user"]["first_name"] = first_name
+    if last_name:
+        data["portal_user"]["last_name"] = last_name
+    if enabled is not None:
+        data["portal_user"]["enabled"] = enabled
+    if max_endorsement_override is not None:
+        data["portal_user"]["max_endorsement_override"] = max_endorsement_override
+    if unsubscribed is not None:
+        data["portal_user"]["unsubscribed"] = unsubscribed
+    
+    if not data["portal_user"]:
+        return json.dumps({"error": "No fields provided to update"})
+    
+    endpoint = f"/idea_portals/{idea_portal_id}/portal_users/{user_id}"
+    return await execute_rest_api(ctx, "PUT", endpoint, data, "update idea portal user")
+
+
+async def list_idea_subscriptions(
+    idea_id: str,
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List idea subscriptions"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/ideas/{idea_id}/subscriptions"
+    params = []
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list idea subscriptions")
+
+
+async def create_idea_subscription(
+    idea_id: str,
+    user_email: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Subscribe users to ideas"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    data = {
+        "idea_subscription": {
+            "email": user_email
+        }
+    }
+    
+    endpoint = f"/ideas/{idea_id}/subscriptions"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create idea subscription")
+
+
+async def delete_idea_subscription(
+    idea_id: str,
+    subscription_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Remove subscriptions"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/ideas/{idea_id}/subscriptions/{subscription_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete idea subscription")
+
+
+async def list_idea_categories(
+    product_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """List idea categories"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/products/{product_id}/idea_categories"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list idea categories")
+
+
+# Strategic Elements Management Tools
+
+async def list_strategic_models(
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List strategy models"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = "/strategy_models"
+    params = []
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list strategic models")
+
+
+async def get_strategic_model(
+    model_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get model details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/strategy_models/{model_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get strategic model")
+
+
+async def list_strategic_visions(
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List strategic visions"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = "/strategy_visions"
+    params = []
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list strategic visions")
+
+
+async def get_strategic_vision(
+    vision_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get vision details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/strategy_visions/{vision_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get strategic vision")
+
+
+async def list_strategic_positions(
+    page: int = 1,
+    per_page: int = 20,
+    ctx: Optional[Context] = None
+) -> str:
+    """List strategic positions"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = "/strategy_positions"
+    params = []
+    if page > 1:
+        params.append(f"page={page}")
+    if per_page != 20:
+        params.append(f"per_page={per_page}")
+    
+    if params:
+        endpoint += "?" + "&".join(params)
+    
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list strategic positions")
+
+
+async def get_strategic_position(
+    position_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Get position details"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/strategy_positions/{position_id}"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="get strategic position")
+
+
+# Integration Management Tools
+
+async def list_integrations(
+    ctx: Optional[Context] = None
+) -> str:
+    """List configured integrations"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = "/integrations"
+    return await execute_rest_api(ctx, "GET", endpoint, operation="list integrations")
+
+
+async def create_integration_field(
+    record_type: str,
+    record_id: str,
+    integration_id: str,
+    field_name: str,
+    field_value: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Map integration fields"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # Validate record type
+    valid_types = ["features", "epics", "idea_endorsements"]
+    if record_type not in valid_types:
+        return json.dumps({"error": f"Invalid record type. Must be one of: {', '.join(valid_types)}"})
+    
+    data = {
+        "integration_field": {
+            "name": field_name,
+            "value": field_value
+        }
+    }
+    
+    endpoint = f"/{record_type}/{record_id}/integrations/{integration_id}/fields"
+    return await execute_rest_api(ctx, "POST", endpoint, data, "create integration field")
+
+
+async def update_integration_field(
+    record_type: str,
+    record_id: str,
+    integration_id: str,
+    field_name: str,
+    field_value: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Update field mappings"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    # For updates, we delete and recreate the field since there's no direct update endpoint
+    # This follows the pattern used in the API documentation
+    return await create_integration_field(record_type, record_id, integration_id, field_name, field_value, ctx)
+
+
+async def delete_integration_field(
+    field_id: str,
+    ctx: Optional[Context] = None
+) -> str:
+    """Remove field mappings"""
+    auth_error = check_auth()
+    if auth_error:
+        return auth_error
+    
+    endpoint = f"/integration_fields/{field_id}"
+    return await execute_rest_api(ctx, "DELETE", endpoint, operation="delete integration field")
