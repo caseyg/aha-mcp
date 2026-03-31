@@ -28,5 +28,9 @@ from client import oauth_tokens
 from oauth import register_oauth_routes
 register_oauth_routes(mcp, oauth_tokens)
 
-if __name__ == "__main__":
+def main():
+    """Entry point for console_scripts (pip install / uv install)."""
     mcp.run()
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,19 @@
+{
+  "schema_version": "v1",
+  "name": "aha-mcp",
+  "display_name": "Aha! MCP Server",
+  "description": "10 unified tools for Aha! product management — fetch, search, create, update, delete any record type with flexible identifiers",
+  "version": "3.0.0",
+  "transport": {
+    "type": "stdio",
+    "command": "python",
+    "args": ["aha_mcp.py"]
+  },
+  "auth": {
+    "type": "env",
+    "variables": [
+      {"name": "AHA_API_TOKEN", "description": "Aha! API token", "required": true},
+      {"name": "AHA_DOMAIN", "description": "Aha! domain (e.g., yourcompany)", "required": true}
+    ]
+  }
+}
