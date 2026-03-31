@@ -3,12 +3,13 @@
 import os
 import json
 import logging
+import html as html_mod
 from typing import Optional
 from datetime import datetime
 from starlette.responses import JSONResponse, RedirectResponse, HTMLResponse
 from authlib.common.security import generate_token
-import httpx
 from fastmcp import FastMCP
+from client import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +20,22 @@ OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "")
 OAUTH_REDIRECT_URI = os.getenv("OAUTH_REDIRECT_URI", "http://localhost:3000/oauth/callback")
 
 # OAuth state storage
-oauth_states = {}
+oauth_states = {}  # {state: {redirect_uri, code_challenge, ..., created_at}}
 oauth_tokens = {}  # This is shared with client.py
+
+# State TTL in seconds (10 minutes)
+_STATE_TTL_SECONDS = 600
+
+
+def _purge_expired_states():
+    """Remove expired OAuth states from memory."""
+    now = datetime.now()
+    expired = [
+        k for k, v in oauth_states.items()
+        if (now - v.get("created_at", datetime.min)).total_seconds() > _STATE_TTL_SECONDS
+    ]
+    for k in expired:
+        oauth_states.pop(k, None)
 
 
 def register_oauth_routes(mcp: FastMCP, tokens_dict):
@@ -104,13 +119,15 @@ def register_oauth_routes(mcp: FastMCP, tokens_dict):
         
         # Validate client_id
         if client_id != OAUTH_CLIENT_ID:
+            safe_client_id = html_mod.escape(str(client_id)) if client_id else "(none)"
             return HTMLResponse(
-                f"<h1>Invalid Client</h1><p>Unknown client_id: {client_id}</p>",
+                f"<h1>Invalid Client</h1><p>Unknown client_id: {safe_client_id}</p>",
                 status_code=400
             )
         
-        # Store state for validation
+        # Store state for validation (and purge expired states)
         if state:
+            _purge_expired_states()
             oauth_states[state] = {
                 "redirect_uri": redirect_uri,
                 "code_challenge": code_challenge,
@@ -146,8 +163,10 @@ def register_oauth_routes(mcp: FastMCP, tokens_dict):
         error = params.get("error")
         
         if error:
+            safe_error = html_mod.escape(str(error))
+            safe_desc = html_mod.escape(str(params.get('error_description', '')))
             return HTMLResponse(
-                f"<h1>OAuth Error</h1><p>{error}: {params.get('error_description', '')}</p>",
+                f"<h1>OAuth Error</h1><p>{safe_error}: {safe_desc}</p>",
                 status_code=400
             )
         
@@ -156,56 +175,72 @@ def register_oauth_routes(mcp: FastMCP, tokens_dict):
                 "<h1>Missing Code</h1><p>No authorization code received.</p>",
                 status_code=400
             )
-        
+
+        # Validate state: must exist and not be expired
+        if state:
+            state_data = oauth_states.get(state)
+            if not state_data:
+                return HTMLResponse(
+                    "<h1>Invalid State</h1><p>OAuth state parameter is invalid or expired.</p>",
+                    status_code=400
+                )
+            created_at = state_data.get("created_at", datetime.min)
+            if (datetime.now() - created_at).total_seconds() > _STATE_TTL_SECONDS:
+                oauth_states.pop(state, None)
+                return HTMLResponse(
+                    "<h1>Expired State</h1><p>OAuth state has expired. Please try again.</p>",
+                    status_code=400
+                )
+
         # Exchange code for token with Aha!
         token_url = f"https://{AHA_DOMAIN}.aha.io/oauth/token"
-        
-        async with httpx.AsyncClient() as client:
-            try:
-                response = await client.post(
-                    token_url,
-                    data={
-                        "grant_type": "authorization_code",
-                        "code": code,
-                        "client_id": OAUTH_CLIENT_ID,
-                        "client_secret": OAUTH_CLIENT_SECRET,
-                        "redirect_uri": OAUTH_REDIRECT_URI
-                    }
-                )
-                response.raise_for_status()
-                token_data = response.json()
-                
-                # Store the token (in production, use secure storage)
-                access_token = token_data.get("access_token")
-                if access_token:
-                    # In a real implementation, associate with user
-                    oauth_tokens["default"] = access_token
-                    
-                    # Get the original redirect URI if we have state
-                    if state and state in oauth_states:
-                        state_data = oauth_states.pop(state)
-                        original_redirect = state_data.get("redirect_uri")
-                        if original_redirect:
-                            # Redirect back to original application with code
-                            return RedirectResponse(
-                                url=f"{original_redirect}?code={generate_token()}&state={state}"
-                            )
-                    
-                    return HTMLResponse(
-                        "<h1>Authorization Successful</h1><p>You can close this window.</p>"
-                    )
-                else:
-                    return HTMLResponse(
-                        "<h1>Token Error</h1><p>No access token received.</p>",
-                        status_code=400
-                    )
-                    
-            except Exception as e:
-                logger.error(f"OAuth token exchange failed: {e}")
+
+        try:
+            client = await get_client()
+            response = await client.post(
+                token_url,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "client_id": OAUTH_CLIENT_ID,
+                    "client_secret": OAUTH_CLIENT_SECRET,
+                    "redirect_uri": OAUTH_REDIRECT_URI
+                }
+            )
+            response.raise_for_status()
+            token_data = response.json()
+
+            # Store the token (in production, use secure storage)
+            access_token = token_data.get("access_token")
+            if access_token:
+                # In a real implementation, associate with user
+                oauth_tokens["default"] = access_token
+
+                # Get the original redirect URI if we have state
+                if state and state in oauth_states:
+                    state_data = oauth_states.pop(state)
+                    original_redirect = state_data.get("redirect_uri")
+                    if original_redirect:
+                        # Redirect back to original application with code
+                        return RedirectResponse(
+                            url=f"{original_redirect}?code={generate_token()}&state={state}"
+                        )
+
                 return HTMLResponse(
-                    f"<h1>Token Exchange Failed</h1><p>{str(e)}</p>",
-                    status_code=500
+                    "<h1>Authorization Successful</h1><p>You can close this window.</p>"
                 )
+            else:
+                return HTMLResponse(
+                    "<h1>Token Error</h1><p>No access token received.</p>",
+                    status_code=400
+                )
+
+        except Exception as e:
+            logger.error(f"OAuth token exchange failed: {e}")
+            return HTMLResponse(
+                "<h1>Token Exchange Failed</h1><p>An internal error occurred during authentication. Please try again.</p>",
+                status_code=500
+            )
     
     @mcp.custom_route("/oauth/token", methods=["POST", "OPTIONS"])
     async def oauth_token_route(request):

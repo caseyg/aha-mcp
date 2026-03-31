@@ -455,6 +455,10 @@ async def aha_search(
         filters["projectId"] = project
     if assignee:
         filters["assignedToUserId"] = assignee
+    if status:
+        filters["workflowStatusId"] = status
+    if tags:
+        filters["tagIds"] = tags
 
     gql_query = f"""query($filters: {plural.title().rstrip('s')}Filters, $page: Int!, $per: Int!) {{
         {plural}(filters: $filters, page: $page, per: $per) {{
@@ -958,34 +962,42 @@ async def aha_my_work(
     req_fields = _fields_for("requirement", response_format)
     task_fields = _fields_for("task", response_format)
 
-    assignee_filter = ""
+    # Build filter dict for parameterized queries
+    assignee_filters: Dict[str, Any] = {}
     if assignee:
-        assignee_filter = f'assignedToUserId: "{assignee}"'
+        assignee_filters["assignedToUserId"] = assignee
 
     async def fetch_features():
-        q = f"""query {{ features(filters: {{{assignee_filter}}}, page: 1, per: 50) {{
-            nodes {{ {feature_fields} }} totalCount
-        }} }}"""
+        q = f"""query($filters: FeatureFilters, $page: Int!, $per: Int!) {{
+            features(filters: $filters, page: $page, per: $per) {{
+                nodes {{ {feature_fields} }} totalCount
+            }}
+        }}"""
         try:
-            return await graphql(ctx, q)
+            return await graphql(ctx, q, {"filters": assignee_filters, "page": 1, "per": 50})
         except Exception:
             return {}
 
     async def fetch_epics():
-        q = f"""query {{ epics(filters: {{{assignee_filter}}}, page: 1, per: 50) {{
-            nodes {{ {epic_fields} }} totalCount
-        }} }}"""
+        q = f"""query($filters: EpicFilters, $page: Int!, $per: Int!) {{
+            epics(filters: $filters, page: $page, per: $per) {{
+                nodes {{ {epic_fields} }} totalCount
+            }}
+        }}"""
         try:
-            return await graphql(ctx, q)
+            return await graphql(ctx, q, {"filters": assignee_filters, "page": 1, "per": 50})
         except Exception:
             return {}
 
     async def fetch_requirements():
-        q = f"""query {{ requirements(filters: {{{assignee_filter}, active: true}}, page: 1, per: 50) {{
-            nodes {{ {req_fields} }} totalCount
-        }} }}"""
+        req_filters = {**assignee_filters, "active": True}
+        q = f"""query($filters: RequirementFilters, $page: Int!, $per: Int!) {{
+            requirements(filters: $filters, page: $page, per: $per) {{
+                nodes {{ {req_fields} }} totalCount
+            }}
+        }}"""
         try:
-            return await graphql(ctx, q)
+            return await graphql(ctx, q, {"filters": req_filters, "page": 1, "per": 50})
         except Exception:
             return {}
 
@@ -993,9 +1005,10 @@ async def aha_my_work(
         # Tasks use REST API since GraphQL task listing is limited
         try:
             endpoint = "/tasks"
+            params = {}
             if assignee:
-                endpoint += f"?assigned_to_user={assignee}"
-            result = await rest_api(ctx, "GET", endpoint)
+                params["assigned_to_user"] = assignee
+            result = await rest_api(ctx, "GET", endpoint, params=params)
             return result
         except Exception:
             return {}
@@ -1050,20 +1063,25 @@ async def aha_recent_activity(
         else ["feature", "idea", "epic"]
     )
 
-    project_filter = f', projectId: "{project}"' if project else ""
+    # Build filters dict for parameterized queries
+    base_filters: Dict[str, Any] = {"updatedSince": since}
+    if project:
+        base_filters["projectId"] = project
 
     async def fetch_type(rtype: str):
         fields = _fields_for(rtype, "concise")
         plural = GQL_PLURAL.get(rtype, rtype + "s")
+        # Use the appropriate filter type name for each record type
+        filter_type = f"{plural.title().rstrip('s')}Filters"
 
-        q = f"""query {{
-            {plural}(filters: {{updatedSince: "{since}"{project_filter}}}, page: 1, per: 30) {{
+        q = f"""query($filters: {filter_type}, $page: Int!, $per: Int!) {{
+            {plural}(filters: $filters, page: $page, per: $per) {{
                 nodes {{ {fields} }}
                 totalCount
             }}
         }}"""
         try:
-            data = await graphql(ctx, q)
+            data = await graphql(ctx, q, {"filters": base_filters, "page": 1, "per": 30})
             items = data.get(plural, {}).get("nodes", [])
             total = data.get(plural, {}).get("totalCount", len(items))
             return rtype, items, total

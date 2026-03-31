@@ -163,7 +163,7 @@ async def _fetch_by_reference(
     """ % gql_type
 
     try:
-        data = await graphql(query, variables={"ref": reference}, ctx=ctx)
+        data = await graphql(ctx, query, {"ref": reference})
         record = data.get(gql_type)
         if record:
             return {
@@ -189,7 +189,7 @@ async def _search_by_name(
         params["type"] = record_type
 
     try:
-        data = await rest_api("GET", endpoint, params=params, ctx=ctx)
+        data = await rest_api(ctx, "GET", endpoint, params=params)
         if not data:
             return []
         results: list[dict[str, Any]] = []
