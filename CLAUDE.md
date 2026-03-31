@@ -11,11 +11,14 @@ Based on the original TypeScript MCP server by Aha! but rewritten in Python with
 ## Commands
 
 ### Build and Run
-- `pip install -r requirements.txt` -- Install dependencies
+- `uv sync` -- Install dependencies (preferred, uses pyproject.toml)
+- `uv run python aha_mcp.py` -- Run the server via UV
+- `pip install -r requirements.txt` -- Install dependencies (legacy)
 - `python aha_mcp.py` -- Run the server (stdio transport)
 - `fastmcp run aha_mcp.py` -- Run via FastMCP CLI
 
 ### Testing
+- `uv run pytest test_tools.py -v` -- Run the tool tests via UV (preferred)
 - `pytest test_tools.py -v` -- Run the tool tests (primary test suite)
 - `pytest test_tools.py -k "test_aha_get"` -- Run a specific test
 

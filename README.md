@@ -18,10 +18,33 @@ A Python MCP server that connects AI agents to Aha!'s product management platfor
 
 ## Installation
 
+### Using UV (Recommended)
+
+```bash
+uv pip install aha-mcp
+# or add to your project
+uv add aha-mcp
+```
+
+### Using pip
+
+```bash
+pip install aha-mcp
+```
+
+### From Source
+
 ```bash
 git clone https://github.com/aha-develop/aha-mcp.git
 cd aha-mcp
-pip install -r requirements.txt
+uv sync            # or: pip install -e ".[dev]"
+```
+
+### Docker
+
+```bash
+docker build -t aha-mcp .
+docker run -e AHA_API_TOKEN=your-token -e AHA_DOMAIN=yoursubdomain aha-mcp
 ```
 
 ## Configuration
@@ -48,14 +71,30 @@ pip install -r requirements.txt
 ## Running the Server
 
 ```bash
+# Run with UV (recommended)
+uv run python aha_mcp.py
+
 # Run directly (uses stdio transport by default)
 python aha_mcp.py
+
+# Run via installed entry point (after pip/uv install)
+aha-mcp
 
 # Or run with FastMCP CLI
 fastmcp run aha_mcp.py
 ```
 
 ## IDE Integration
+
+<details>
+<summary><b>Claude Code</b></summary>
+
+```bash
+claude mcp add aha-mcp -- python aha_mcp.py
+```
+
+Set environment variables in your `.env` file or shell before running.
+</details>
 
 <details>
 <summary><b>Claude Desktop</b></summary>
@@ -224,14 +263,11 @@ MCP resources for direct data access:
 ### Running Tests
 
 ```bash
-# Run the new tool tests
+# Run with UV (recommended)
+uv run pytest test_tools.py -v
+
+# Run directly
 pytest test_tools.py -v
-
-# Run the legacy tests
-pytest test_aha_mcp.py -v
-
-# Run all tests
-pytest -v
 
 # Run a specific test
 pytest test_tools.py -k "test_aha_get"
@@ -240,6 +276,8 @@ pytest test_tools.py -k "test_aha_get"
 ### Debug Mode
 
 ```bash
+LOG_LEVEL=debug uv run python aha_mcp.py
+# or
 LOG_LEVEL=debug python aha_mcp.py
 ```
 
@@ -270,7 +308,7 @@ Key design decisions:
 
 ## Troubleshooting
 
-- **ModuleNotFoundError**: Run `pip install -r requirements.txt`
+- **ModuleNotFoundError**: Run `uv sync` or `pip install -r requirements.txt`
 - **Python version error**: Requires Python 3.10+ (`python --version`)
 - **Authentication**: Verify API token and AHA_DOMAIN are set correctly
 - **Invalid reference**: Use formats like `PROJ-123` (feature), `PROJ-I-45` (idea), `PROJ-E-1` (epic)

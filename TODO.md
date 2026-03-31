@@ -50,9 +50,9 @@
 
 ## P3: Distribution & Adoption
 
-- [ ] **Package as pip installable**: `pip install aha-mcp` would improve adoption.
-- [ ] **Dockerfile**: For containerized deployment.
-- [ ] **manifest.json**: Anthropic plugin format compatibility.
+- [x] **Package as pip installable**: pyproject.toml with UV and pip support, console_scripts entry point.
+- [x] **Dockerfile**: For containerized deployment.
+- [x] **manifest.json**: Anthropic plugin format compatibility.
 - [ ] **MCP Inspector testing**: Verify server works with the official MCP Inspector.
 
 ## P3: Test Coverage
