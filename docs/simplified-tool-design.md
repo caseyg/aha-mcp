@@ -56,7 +56,8 @@ Replaces: `get_record`, `get_feature_details`, `get_idea`, `get_page`, `get_task
 async def aha_get(
     identifier: str,
     record_type: str = None,
-    response_format: str = "detailed"
+    response_format: str = "detailed",
+    content_format: str = "markdown"
 ) -> str:
     """Fetch any Aha! record by reference number, name, or ID.
 
@@ -70,6 +71,7 @@ async def aha_get(
     "release", "goal", "requirement", "page", "task", "key_result".
 
     response_format: "detailed" (all fields) or "concise" (name, status, assignee only).
+    content_format: "markdown" (default, converts HTML descriptions to Markdown) or "html" (raw).
     """
 ```
 
@@ -133,7 +135,8 @@ async def aha_create(
         "key_result", "record_link".
     name: Required. The title/name of the record.
     project: Project name or key. Required for features, ideas, epics, releases.
-    description: Body text (supports HTML).
+    description: Body text. Write in Markdown — automatically converted to HTML for Aha!.
+        Pass content_format="html" to send raw HTML instead.
     assignee: Name or email of the person to assign.
     parent: Reference or name of parent record (e.g., epic for a feature).
     release: Reference or name of release to assign to.
@@ -353,3 +356,44 @@ Not:
 Results truncated (showing 20 of 347 features).
 Use filters to narrow: aha_search(record_type="feature", status="In progress", project="PROJ")
 ```
+
+### 8. Automatic Markdown ↔ HTML translation
+
+Aha!'s API expects HTML for all rich-text fields (descriptions, bodies, comments) and returns HTML in responses. But agents naturally write and read Markdown. The server handles this transparently:
+
+**On input (agent → Aha!):**
+- Detect whether the `description`/`body` content is Markdown or HTML
+- If Markdown, convert to HTML before sending to the API
+- Detection heuristic: if the string contains `<p>`, `<h1>`, `<div>`, `<ul>`, etc. → treat as HTML. Otherwise → treat as Markdown.
+
+**On output (Aha! → agent):**
+- Convert all HTML description/body fields to Markdown before returning
+- Strip unnecessary HTML cruft (empty divs, style attributes, nbsp entities)
+- Preserve structural elements (headings, lists, bold/italic, links, tables)
+
+**Override flag:**
+- `content_format: "markdown"` (default) — automatic conversion both ways
+- `content_format: "html"` — pass through raw HTML, no conversion
+
+This means agents can write:
+```
+aha_create(
+    record_type="feature",
+    name="User Onboarding V2",
+    description="## Goals\n\n- Reduce time-to-first-value\n- Improve activation rate\n\n**Key metric:** 7-day retention"
+)
+```
+
+And the server sends to Aha!:
+```html
+<h2>Goals</h2>
+<ul>
+<li>Reduce time-to-first-value</li>
+<li>Improve activation rate</li>
+</ul>
+<p><strong>Key metric:</strong> 7-day retention</p>
+```
+
+And when reading back, `aha_get("PROJ-123")` returns Markdown, not the HTML blob.
+
+**Implementation:** Use `markdown-it` (or Python `markdown` + `markdownify`) for bidirectional conversion. Add as a utility layer in the client, not per-tool — every tool benefits automatically.
