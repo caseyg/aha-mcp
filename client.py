@@ -160,15 +160,20 @@ async def _request_with_retry(
 
 
 async def graphql(
+    ctx: Any,
     query: str,
     variables: dict[str, Any] | None = None,
-    ctx: Any = None,
 ) -> dict[str, Any]:
     """Execute a GraphQL query/mutation against the Aha! API.
 
     All queries **must** use ``$variables`` for parameterization -- never
     f-string interpolation.  This function enforces that by accepting
     *variables* as a separate dict.
+
+    Args:
+        ctx: FastMCP Context (used for per-user auth resolution).
+        query: The GraphQL query/mutation string.
+        variables: Query variables dict.
 
     Raises:
         AhaAuthError: on 401.
@@ -207,17 +212,22 @@ async def graphql(
 
 
 async def rest_api(
+    ctx: Any,
     method: str,
     endpoint: str,
     data: dict[str, Any] | list | None = None,
     params: dict[str, str] | None = None,
     use_form_data: bool = False,
-    ctx: Any = None,
 ) -> Any:
     """Execute a REST API request against the Aha! v1 API.
 
-    *endpoint* should be a path like ``"/features/PROJ-123"`` (the ``/api/v1``
-    prefix is added automatically if missing).
+    Args:
+        ctx: FastMCP Context (used for per-user auth resolution).
+        method: HTTP method (GET, POST, PUT, DELETE).
+        endpoint: Path like ``"/features/PROJ-123"`` (``/api/v1`` prefix added if missing).
+        data: Request body (JSON or form data).
+        params: Query parameters.
+        use_form_data: If True, send data as form-encoded instead of JSON.
 
     Raises:
         AhaAuthError: on 401.

@@ -36,7 +36,7 @@ aha_mcp.py       -- Entry point. Creates FastMCP instance, registers tools/promp
 aha-mcp.py       -- LEGACY entry point (78-tool era). Still works but uses old tool registration.
 client.py        -- Shared httpx.AsyncClient with connection pooling (20 connections),
                     30s timeout, retry on 429/503 with exponential backoff.
-                    Exports: graphql(query, variables, ctx), rest_api(method, endpoint, ...),
+                    Exports: graphql(ctx, query, variables), rest_api(ctx, method, endpoint, ...),
                     check_auth(), get_auth_headers(), close_client(), oauth_tokens.
 tools.py         -- 10 unified tools: aha_get, aha_search, aha_create, aha_update,
                     aha_delete, aha_promote_idea, aha_upload_attachment, aha_my_work,
@@ -73,8 +73,8 @@ utils.py         -- LEGACY utilities from the 78-tool era. Contains CrudTemplate
 
 ### API Client (client.py)
 - **Shared httpx.AsyncClient**: Lazy-created singleton with connection pooling.
-- **graphql(query, variables, ctx)**: Parameterized queries only. Raises on GraphQL errors.
-- **rest_api(method, endpoint, data, params, ...)**: REST fallback. Auto-prefixes `/api/v1`.
+- **graphql(ctx, query, variables)**: Parameterized queries only. Raises on GraphQL errors.
+- **rest_api(ctx, method, endpoint, data, params, ...)**: REST fallback. Auto-prefixes `/api/v1`.
 - **Retry**: 429/503 retried up to 3 times with exponential backoff.
 
 ### Reference Number Formats
@@ -89,14 +89,8 @@ utils.py         -- LEGACY utilities from the 78-tool era. Contains CrudTemplate
 
 ## Known Issues
 
-### Call Signature Mismatch (CRITICAL)
-`tools.py`, `resources.py`, and `utils.py` call `graphql(ctx, query, variables)` and `rest_api(ctx, method, endpoint, data)` but `client.py` defines `graphql(query, variables, ctx)` and `rest_api(method, endpoint, data, params, use_form_data, ctx)`. The argument order is reversed. Tests pass because they mock at the `tools.graphql` level, bypassing the real client. This must be fixed before production use.
-
 ### Resources Bug
 `resources.py` still uses the old `check_auth()` pattern (expects it to return a string) rather than the new pattern (raises `AhaAuthError`). Also has the indentation bug in `releases_by_status` where `feature_stats` is only computed for "active" releases.
-
-### format_response_field Type Mismatch
-`tools.py:_format_output()` calls `format_response_field(data)` with a dict/list, but `formatting.py:format_response_field()` expects a string. This will fail at runtime when `content_format="markdown"`.
 
 ### Legacy Files
 - `aha-mcp.py`: Old entry point with dual resource registration. Superseded by `aha_mcp.py`.
