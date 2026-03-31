@@ -396,4 +396,38 @@ And the server sends to Aha!:
 
 And when reading back, `aha_get("PROJ-123")` returns Markdown, not the HTML blob.
 
-**Implementation:** Use `markdown-it` (or Python `markdown` + `markdownify`) for bidirectional conversion. Add as a utility layer in the client, not per-tool — every tool benefits automatically.
+**Implementation:** Use Python `markdown` + `markdownify` for bidirectional conversion. Add as a utility layer in the client, not per-tool — every tool benefits automatically.
+
+---
+
+## Additional Best Practices Applied
+
+### 9. Full test coverage
+Every tool gets unit tests for success path, error path, and edge cases. Tests verify:
+- Correct GraphQL query construction (not just that the mock was called)
+- Identifier resolution (ref, name, ID) for each tool
+- Error responses include helpful messages with examples
+- `response_format` produces correctly shaped output for both modes
+- `content_format` conversion (Markdown in → HTML sent; HTML back → Markdown returned)
+- Pagination, truncation, and filter behavior
+
+### 10. Shared httpx.AsyncClient with connection pooling
+A single `httpx.AsyncClient` with connection pooling, 30s timeout, and retry logic for 429/503. No more creating a new TCP connection per API call.
+
+### 11. MCP-native error handling
+Raise `McpError` with proper error codes (`InvalidParams`, `InternalError`) instead of returning JSON error strings. The MCP client can programmatically distinguish error types.
+
+### 12. Parameterized GraphQL queries
+All GraphQL queries use `$variables` — never f-string interpolation. Eliminates GraphQL injection.
+
+### 13. `@require_auth` decorator
+Applied once per tool via decorator, not copy-pasted 10 times.
+
+### 14. Pagination caps
+`per_page` capped at 100. Responses include total count and a hint for narrowing results.
+
+### 15. Caching for static data
+`aha_introspect` and workflow/tag metadata cached with a 5-minute TTL. Saves redundant API calls for data that rarely changes.
+
+### 16. Parallel API calls in composite tools
+`aha_my_work` and `aha_recent_activity` use `asyncio.gather()` to run multiple queries concurrently instead of sequentially.
