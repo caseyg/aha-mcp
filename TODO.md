@@ -35,14 +35,14 @@
 
 ## P2: Feature Gaps (from simplified-tool-design.md)
 
-- [ ] **Name-based identifier resolution for aha_create**: The `project` and `release` params accept IDs but not names. Should resolve "Q3 Release" -> release ID.
-- [ ] **"me" / current user support in aha_my_work**: Design spec says "defaults to authenticated user" but implementation requires explicit email/ID.
-- [ ] **Helpful not-found errors**: Design spec says errors should suggest similar records (e.g., "Did you mean PROJ-99?"). Current errors just say "not found".
+- [x] **Name-based identifier resolution for aha_create**: The `project` and `release` params now accept names (resolved via GraphQL search).
+- [x] **"me" / current user support in aha_my_work**: `assignee=None` or `"me"` now resolves to the authenticated user via `{ me { id } }` GraphQL query.
+- [x] **Helpful not-found errors**: Resolver now does a fuzzy search on not-found and suggests similar records ("Did you mean: ...").
 
 ## P3: MCP Best Practices Still Missing
 
 - [ ] **stdio transport documentation**: MCP best practices recommend stdio for local use. README should document both stdio and HTTP transport options.
-- [ ] **MCP-native error codes**: errors.py defines the hierarchy but tools catch exceptions and return JSON error strings instead of raising McpError with proper error codes (-32602, -32603, etc.).
+- [x] **MCP-native error codes**: Tools now raise `fastmcp.exceptions.ToolError` instead of returning JSON error strings. FastMCP wraps these as proper MCP error responses with `isError=True`.
 - [ ] **Resource subscriptions**: MCP spec recommends `notifications/resources/updated` for changing resources. Not implemented.
 - [ ] **Progress notifications**: Long-running operations should send progress updates. Not implemented.
 - [ ] **Output schemas**: MCP spec recommends `outputSchema` for structured tool responses. Not implemented.

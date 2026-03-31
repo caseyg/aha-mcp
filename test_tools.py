@@ -11,6 +11,7 @@ import asyncio
 from unittest.mock import AsyncMock, patch, MagicMock, call
 
 from fastmcp import Client
+from fastmcp.exceptions import ToolError
 
 import os
 import sys
@@ -35,6 +36,7 @@ def get_json(result) -> dict:
     return json.loads(get_text(result))
 
 
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
@@ -54,15 +56,23 @@ async def test_client(mock_env):
          patch("tools.check_auth", return_value=None), \
          patch("tools.resolve_identifier", new_callable=AsyncMock) as mock_resolver, \
          patch("tools.detect_record_type") as mock_detect, \
-         patch("tools.format_response_field", side_effect=lambda x, *a, **kw: x):
+         patch("tools.format_response_field", side_effect=lambda x, *a, **kw: x), \
+         patch("tools._resolve_current_user", new_callable=AsyncMock) as mock_resolve_user, \
+         patch("tools._resolve_project_or_release", new_callable=AsyncMock) as mock_resolve_proj:
         # Default: resolve_identifier returns a dict with id and _type
         mock_resolver.return_value = {"id": "111", "_type": "feature", "reference": "PROJ-123"}
         mock_detect.return_value = "feature"
+        # Default: current user resolves to a test user ID
+        mock_resolve_user.return_value = "u1"
+        # Default: project/release resolution passes through the value
+        mock_resolve_proj.side_effect = lambda v, k, c: v
         async with Client(mcp) as client:
             client.mock_graphql = mock_gql
             client.mock_rest = mock_rest_fn
             client.mock_resolver = mock_resolver
             client.mock_detect = mock_detect
+            client.mock_resolve_user = mock_resolve_user
+            client.mock_resolve_proj = mock_resolve_proj
             yield client
 
 
@@ -380,9 +390,8 @@ class TestAhaGet:
     async def test_not_found_returns_error(self, test_client):
         test_client.mock_resolver.return_value = {"id": "PROJ-123", "_type": "feature"}
         test_client.mock_graphql.return_value = {"feature": None}
-        result = await test_client.call_tool("aha_get", {"identifier": "PROJ-123"})
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)not found"):
+            await test_client.call_tool("aha_get", {"identifier": "PROJ-123"})
 
     @pytest.mark.asyncio
     async def test_html_content_format(self, test_client):
@@ -597,13 +606,12 @@ class TestAhaCreate:
                 },
             }
         }
-        result = await test_client.call_tool("aha_create", {
-            "record_type": "feature",
-            "name": "",
-            "release": "PROJ-R-1",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="Name is required"):
+            await test_client.call_tool("aha_create", {
+                "record_type": "feature",
+                "name": "",
+                "release": "PROJ-R-1",
+            })
 
     @pytest.mark.asyncio
     async def test_create_idea(self, test_client):
@@ -685,21 +693,19 @@ class TestAhaCreate:
     @pytest.mark.asyncio
     async def test_create_requires_project(self, test_client):
         """Creating a feature without project or release should error."""
-        result = await test_client.call_tool("aha_create", {
-            "record_type": "feature",
-            "name": "Orphan Feature",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)requires"):
+            await test_client.call_tool("aha_create", {
+                "record_type": "feature",
+                "name": "Orphan Feature",
+            })
 
     @pytest.mark.asyncio
     async def test_create_unsupported_type(self, test_client):
-        result = await test_client.call_tool("aha_create", {
-            "record_type": "nonexistent",
-            "name": "Test",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)nonexistent"):
+            await test_client.call_tool("aha_create", {
+                "record_type": "nonexistent",
+                "name": "Test",
+            })
 
     @pytest.mark.asyncio
     async def test_create_with_assignee(self, test_client):
@@ -870,11 +876,10 @@ class TestAhaUpdate:
     async def test_update_no_fields_error(self, test_client):
         """Update with no fields to change should error."""
         test_client.mock_resolver.return_value = {"id": "111", "_type": "feature"}
-        result = await test_client.call_tool("aha_update", {
-            "identifier": "PROJ-123",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)no fields"):
+            await test_client.call_tool("aha_update", {
+                "identifier": "PROJ-123",
+            })
 
     @pytest.mark.asyncio
     async def test_update_with_assignee_email(self, test_client):
@@ -1072,11 +1077,10 @@ class TestAhaPromoteIdea:
     async def test_promote_idea_api_error(self, test_client):
         test_client.mock_resolver.return_value = {"id": "999", "_type": "idea"}
         test_client.mock_rest.side_effect = RuntimeError("Idea not found")
-        result = await test_client.call_tool("aha_promote_idea", {
-            "idea": "PROJ-I-999",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)idea not found"):
+            await test_client.call_tool("aha_promote_idea", {
+                "idea": "PROJ-I-999",
+            })
 
 
 # ===========================================================================
@@ -1107,12 +1111,11 @@ class TestAhaUploadAttachment:
     async def test_upload_attachment_api_error(self, test_client):
         test_client.mock_resolver.return_value = {"id": "999", "_type": "feature"}
         test_client.mock_rest.side_effect = RuntimeError("Record not found")
-        result = await test_client.call_tool("aha_upload_attachment", {
-            "record": "PROJ-999",
-            "file_url": "https://example.com/file.pdf",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)record not found"):
+            await test_client.call_tool("aha_upload_attachment", {
+                "record": "PROJ-999",
+                "file_url": "https://example.com/file.pdf",
+            })
 
     @pytest.mark.asyncio
     async def test_upload_attachment_to_idea(self, test_client):
@@ -1337,19 +1340,17 @@ class TestAhaIntrospect:
 
     @pytest.mark.asyncio
     async def test_introspect_type_requires_type_name(self, test_client):
-        result = await test_client.call_tool("aha_introspect", {
-            "query_type": "type",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)type_name"):
+            await test_client.call_tool("aha_introspect", {
+                "query_type": "type",
+            })
 
     @pytest.mark.asyncio
     async def test_introspect_invalid_query_type(self, test_client):
-        result = await test_client.call_tool("aha_introspect", {
-            "query_type": "invalid",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)invalid"):
+            await test_client.call_tool("aha_introspect", {
+                "query_type": "invalid",
+            })
 
     @pytest.mark.asyncio
     async def test_introspect_default_overview(self, test_client):
@@ -1370,55 +1371,49 @@ class TestErrorHandling:
     async def test_graphql_error_in_get(self, test_client):
         test_client.mock_resolver.return_value = {"id": "111", "_type": "feature"}
         test_client.mock_graphql.side_effect = RuntimeError("Internal server error")
-        result = await test_client.call_tool("aha_get", {"identifier": "PROJ-123"})
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)internal server error"):
+            await test_client.call_tool("aha_get", {"identifier": "PROJ-123"})
 
     @pytest.mark.asyncio
     async def test_resolver_not_found(self, test_client):
         from errors import AhaNotFoundError
         test_client.mock_resolver.side_effect = AhaNotFoundError("Not found")
-        result = await test_client.call_tool("aha_get", {"identifier": "PROJ-999"})
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)not found"):
+            await test_client.call_tool("aha_get", {"identifier": "PROJ-999"})
 
     @pytest.mark.asyncio
     async def test_rest_api_error_in_delete(self, test_client):
         test_client.mock_resolver.return_value = {"id": "111", "_type": "feature"}
         test_client.mock_graphql.side_effect = RuntimeError("delete not supported")
         test_client.mock_rest.side_effect = RuntimeError("404 Not Found")
-        result = await test_client.call_tool("aha_delete", {"identifier": "PROJ-999"})
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="404"):
+            await test_client.call_tool("aha_delete", {"identifier": "PROJ-999"})
 
     @pytest.mark.asyncio
     async def test_create_exception(self, test_client):
         test_client.mock_graphql.side_effect = RuntimeError("Connection timed out")
-        result = await test_client.call_tool("aha_create", {
-            "record_type": "feature",
-            "name": "Test",
-            "project": "PROJ",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)connection timed out"):
+            await test_client.call_tool("aha_create", {
+                "record_type": "feature",
+                "name": "Test",
+                "project": "PROJ",
+            })
 
     @pytest.mark.asyncio
     async def test_update_exception(self, test_client):
         test_client.mock_resolver.return_value = {"id": "111", "_type": "feature"}
         test_client.mock_graphql.side_effect = RuntimeError("Connection timed out")
-        result = await test_client.call_tool("aha_update", {
-            "identifier": "PROJ-123",
-            "name": "Test",
-        })
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)connection timed out"):
+            await test_client.call_tool("aha_update", {
+                "identifier": "PROJ-123",
+                "name": "Test",
+            })
 
     @pytest.mark.asyncio
     async def test_search_exception(self, test_client):
         test_client.mock_graphql.side_effect = RuntimeError("Search failed")
-        result = await test_client.call_tool("aha_search", {"query": "test"})
-        data = get_json(result)
-        assert "error" in data
+        with pytest.raises(ToolError, match="(?i)search failed"):
+            await test_client.call_tool("aha_search", {"query": "test"})
 
     @pytest.mark.asyncio
     async def test_resolver_ambiguous_matches(self, test_client):

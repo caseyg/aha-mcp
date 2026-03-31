@@ -88,9 +88,11 @@ async def resolve_identifier(
         result = await _fetch_by_reference(identifier, rtype, ctx)
         if result:
             return result
+        # --- "Did you mean?" fuzzy suggestions ---
+        suggestion = await _build_did_you_mean(identifier, rtype, ctx)
         raise AhaNotFoundError(
             f'Could not find {rtype} "{identifier}".',
-            suggestion=f'Example: aha_get("{identifier}") -- check that the reference exists in your Aha! account.',
+            suggestion=suggestion,
         )
 
     # ------------------------------------------------------------------
@@ -121,7 +123,10 @@ async def resolve_identifier(
         )
     raise AhaNotFoundError(
         f'Could not find any record matching "{identifier}".',
-        suggestion=f'Example: aha_get("PROJ-123") or aha_get("Q3 Planning")',
+        suggestion=(
+            'Try a reference number like "PROJ-123" or check the exact name.\n'
+            'Example: aha_get("PROJ-123") or aha_search(query="...")'
+        ),
     )
 
 
@@ -175,6 +180,49 @@ async def _fetch_by_reference(
     except Exception:
         pass
     return None
+
+
+async def _build_did_you_mean(
+    identifier: str, record_type: str, ctx: Any,
+) -> str:
+    """Build a "Did you mean?" suggestion by searching for similar records.
+
+    Extracts the project prefix and number from the identifier and searches
+    for records in the same project.  Returns a formatted suggestion string
+    with up to 3 similar matches.
+    """
+    # Extract the project prefix (e.g., "PROJ" from "PROJ-999")
+    parts = identifier.split("-")
+    prefix = parts[0] if parts else identifier
+
+    try:
+        from client import graphql as _gql  # noqa: WPS433
+
+        # Search for records in the same project with similar references
+        search_query = """query($q: String!) {
+            searchDocuments(filters: {query: $q}, page: 1, per: 3) {
+                nodes { name searchableId searchableType }
+            }
+        }"""
+        data = await _gql(ctx, search_query, {"q": prefix})
+        nodes = data.get("searchDocuments", {}).get("nodes", [])
+
+        if nodes:
+            candidates = ", ".join(
+                f'{n.get("searchableId", "?")} ({n.get("name", "?")})'
+                for n in nodes[:3]
+            )
+            return (
+                f"Did you mean: {candidates}?\n"
+                f'Example: aha_get("{prefix}-123") or aha_search(query="...")'
+            )
+    except Exception:
+        pass
+
+    return (
+        f'Check that the reference exists in your Aha! account.\n'
+        f'Example: aha_get("{prefix}-123") or aha_search(query="...")'
+    )
 
 
 async def _search_by_name(

@@ -249,6 +249,68 @@ def _build_attributes(
     return attrs
 
 
+async def _resolve_current_user(ctx: Any) -> Optional[str]:
+    """Resolve the currently authenticated user's ID via the Aha! API.
+
+    Queries ``{ me { id email } }`` and returns the user ID.  Falls back
+    gracefully -- if the query fails, returns None so the tool still works
+    (just without a user filter).
+    """
+    try:
+        data = await graphql(ctx, "query { me { id email } }")
+        me = data.get("me")
+        if me:
+            return me.get("id") or me.get("email")
+    except Exception:
+        pass
+    return None
+
+
+async def _resolve_project_or_release(
+    value: str, kind: str, ctx: Any,
+) -> str:
+    """Resolve a project/release name or reference to its ID.
+
+    If *value* looks like an ID (numeric) or a known reference pattern it is
+    returned as-is.  Otherwise we search by name and return the first match's
+    ID, raising ``ToolError`` if nothing is found.
+    """
+    from resolver import is_reference
+
+    # Already an ID or reference -- pass through
+    if value.isdigit() or is_reference(value):
+        return value
+
+    # Try name search via GraphQL
+    plural = "projects" if kind == "project" else "releases"
+    fields = "id name" if kind == "project" else "id referenceNum name"
+    query = f"""query($q: String!) {{
+        {plural}(filters: {{name: $q}}, page: 1, per: 5) {{
+            nodes {{ {fields} }}
+        }}
+    }}"""
+
+    try:
+        data = await graphql(ctx, query, {"q": value})
+        nodes = data.get(plural, {}).get("nodes", [])
+        if not nodes:
+            raise ToolError(
+                f"Could not find {kind} '{value}'.\n"
+                f'Hint: Use a {kind} ID or reference number instead.'
+            )
+        # Exact name match preferred
+        for node in nodes:
+            if node.get("name", "").lower() == value.lower():
+                return node["id"]
+        # Otherwise first result
+        return nodes[0]["id"]
+    except ToolError:
+        raise
+    except Exception:
+        # Can't resolve -- pass value through and let the API reject it
+        return value
+
+
 # ---------------------------------------------------------------------------
 # Tool registration
 # ---------------------------------------------------------------------------
@@ -599,22 +661,26 @@ async def aha_create(
       aha_create("idea", "Dark mode", project="PROJ", description="## Summary\\nUsers want dark mode.")
       aha_create("task", "Update docs", parent="PROJ-123", due_date="2026-04-15")
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     type_name = GQL_MUTATION_TYPE.get(record_type)
     if not type_name:
-        return _format_output({
-            "error": f"Cannot create record type '{record_type}'.",
-            "hint": f"Supported: {', '.join(GQL_MUTATION_TYPE.keys())}",
-        })
+        raise tool_error_from_message(
+            f"Cannot create record type '{record_type}'.",
+            hint=f"Supported: {', '.join(GQL_MUTATION_TYPE.keys())}",
+        )
 
     if record_type in REQUIRES_PROJECT and not project and not release:
-        return _format_output({
-            "error": f"Creating a {record_type} requires a 'project' or 'release' parameter.",
-            "example": f'aha_create("{record_type}", "My Record", project="PROJ")',
-        })
+        raise ToolError(
+            f"Creating a {record_type} requires a 'project' or 'release' parameter.\n"
+            f'Example: aha_create("{record_type}", "My Record", project="PROJ")'
+        )
+
+    # --- Task 4: Resolve project/release names to IDs ---
+    if project:
+        project = await _resolve_project_or_release(project, "project", ctx)
+    if release:
+        release = await _resolve_project_or_release(release, "release", ctx)
 
     attrs = _build_attributes(
         name=name, description=description, assignee=assignee,
@@ -639,13 +705,15 @@ async def aha_create(
 
     try:
         data = await graphql(ctx, mutation, {"attrs": attrs})
+    except AhaError as e:
+        raise_tool_error(e)
     except Exception as e:
-        return _format_output({"error": f"Failed to create {record_type}: {e}"})
+        raise ToolError(f"Failed to create {record_type}: {e}") from e
 
     result = data.get(f"create{type_name}", {})
     err = _mutation_error(result)
     if err:
-        return _format_output({"error": f"Failed to create {record_type}.", "details": err})
+        raise ToolError(f"Failed to create {record_type}.\n{err}")
 
     created = result.get(gql_singular, {})
     ref = created.get("referenceNum", created.get("id", ""))
@@ -686,16 +754,12 @@ async def aha_update(
       aha_update("PROJ-123", tags=["priority", "q3"])
       aha_update("PROJ-123", extra_fields={"score": 85})
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     try:
         resolved = await resolve_identifier(identifier, ctx=ctx)
-    except AhaNotFoundError as e:
-        return _format_output({"error": str(e)})
     except AhaError as e:
-        return _format_output({"error": str(e)})
+        raise_tool_error(e)
 
     if isinstance(resolved, dict) and "matches" in resolved:
         return _format_output(resolved)
@@ -705,10 +769,10 @@ async def aha_update(
     type_name = GQL_MUTATION_TYPE.get(rtype)
 
     if not type_name:
-        return _format_output({
-            "error": f"Cannot update record type '{rtype}'.",
-            "hint": f"Supported: {', '.join(GQL_MUTATION_TYPE.keys())}",
-        })
+        raise tool_error_from_message(
+            f"Cannot update record type '{rtype}'.",
+            hint=f"Supported: {', '.join(GQL_MUTATION_TYPE.keys())}",
+        )
 
     attrs = _build_attributes(
         name=name, description=description, assignee=assignee,
@@ -717,10 +781,10 @@ async def aha_update(
     )
 
     if not attrs:
-        return _format_output({
-            "error": "No fields to update. Provide at least one field to change.",
-            "example": 'aha_update("PROJ-123", name="New Name")',
-        })
+        raise ToolError(
+            "No fields to update. Provide at least one field to change.\n"
+            'Example: aha_update("PROJ-123", name="New Name")'
+        )
 
     gql_singular = GQL_SINGULAR.get(rtype, rtype)
     concise = CONCISE_FIELDS.get(rtype, "id name")
@@ -734,13 +798,15 @@ async def aha_update(
 
     try:
         data = await graphql(ctx, mutation, {"id": record_id, "attrs": attrs})
+    except AhaError as e:
+        raise_tool_error(e)
     except Exception as e:
-        return _format_output({"error": f"Failed to update {rtype} '{identifier}': {e}"})
+        raise ToolError(f"Failed to update {rtype} '{identifier}': {e}") from e
 
     result = data.get(f"update{type_name}", {})
     err = _mutation_error(result)
     if err:
-        return _format_output({"error": f"Failed to update {rtype}.", "details": err})
+        raise ToolError(f"Failed to update {rtype}.\n{err}")
 
     updated = result.get(gql_singular, {})
     return _format_output({"updated": updated, "message": f"{rtype.title()} '{identifier}' updated."})
@@ -760,16 +826,12 @@ async def aha_delete(
 
     identifier: Reference number, name, or ID. Examples: "PROJ-123", "Old Feature", "6789012345".
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     try:
         resolved = await resolve_identifier(identifier, ctx=ctx)
-    except AhaNotFoundError as e:
-        return _format_output({"error": str(e)})
     except AhaError as e:
-        return _format_output({"error": str(e)})
+        raise_tool_error(e)
 
     if isinstance(resolved, dict) and "matches" in resolved:
         return _format_output(resolved)
@@ -784,8 +846,10 @@ async def aha_delete(
             endpoint = f"/{GQL_PLURAL.get(rtype, rtype + 's')}/{record_id}"
             await rest_api(ctx, "DELETE", endpoint)
             return _format_output({"deleted": True, "message": f"{rtype.title()} '{identifier}' deleted."})
+        except AhaError as e:
+            raise_tool_error(e)
         except Exception as e:
-            return _format_output({"error": f"Failed to delete '{identifier}': {e}"})
+            raise ToolError(f"Failed to delete '{identifier}': {e}") from e
 
     gql_singular = GQL_SINGULAR.get(rtype, rtype)
 
@@ -798,19 +862,21 @@ async def aha_delete(
 
     try:
         data = await graphql(ctx, mutation, {"id": record_id})
-    except Exception as e:
+    except Exception:
         # Some types only support REST delete (ideas, etc.)
         try:
             endpoint = f"/{GQL_PLURAL.get(rtype, rtype + 's')}/{record_id}"
             await rest_api(ctx, "DELETE", endpoint)
             return _format_output({"deleted": True, "message": f"{rtype.title()} '{identifier}' deleted."})
+        except AhaError as e2:
+            raise_tool_error(e2)
         except Exception as e2:
-            return _format_output({"error": f"Failed to delete '{identifier}': {e2}"})
+            raise ToolError(f"Failed to delete '{identifier}': {e2}") from e2
 
     result = data.get(f"delete{type_name}", {})
     err = _mutation_error(result)
     if err:
-        return _format_output({"error": f"Failed to delete {rtype}.", "details": err})
+        raise ToolError(f"Failed to delete {rtype}.\n{err}")
 
     return _format_output({"deleted": True, "message": f"{rtype.title()} '{identifier}' deleted."})
 
@@ -834,16 +900,12 @@ async def aha_promote_idea(
 
     Returns the newly created feature with its reference number.
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     try:
         resolved = await resolve_identifier(idea, "idea", ctx)
-    except AhaNotFoundError as e:
-        return _format_output({"error": str(e)})
     except AhaError as e:
-        return _format_output({"error": str(e)})
+        raise_tool_error(e)
 
     if isinstance(resolved, dict) and "matches" in resolved:
         return _format_output(resolved)
@@ -862,8 +924,10 @@ async def aha_promote_idea(
             "promoted": result,
             "message": f"Idea '{idea}' promoted to feature.",
         })
+    except AhaError as e:
+        raise_tool_error(e)
     except Exception as e:
-        return _format_output({"error": f"Failed to promote idea '{idea}': {e}"})
+        raise ToolError(f"Failed to promote idea '{idea}': {e}") from e
 
 
 # ===================================================================
@@ -882,14 +946,12 @@ async def aha_upload_attachment(
 
     Example: aha_upload_attachment("PROJ-123", "https://example.com/spec.pdf")
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     try:
         resolved = await resolve_identifier(record, ctx=ctx)
-    except (AhaNotFoundError, AhaError) as e:
-        return _format_output({"error": str(e)})
+    except AhaError as e:
+        raise_tool_error(e)
 
     if isinstance(resolved, dict) and "matches" in resolved:
         return _format_output(resolved)
@@ -910,10 +972,10 @@ async def aha_upload_attachment(
 
     endpoint = endpoint_map.get(rtype)
     if not endpoint:
-        return _format_output({
-            "error": f"Attachments not supported for type '{rtype}'.",
-            "hint": f"Supported: {', '.join(endpoint_map.keys())}",
-        })
+        raise tool_error_from_message(
+            f"Attachments not supported for type '{rtype}'.",
+            hint=f"Supported: {', '.join(endpoint_map.keys())}",
+        )
 
     # Extract filename from URL
     file_name = file_url.rsplit("/", 1)[-1].split("?")[0] or "attachment"
@@ -932,8 +994,10 @@ async def aha_upload_attachment(
             "attached": result,
             "message": f"File attached to {rtype} '{record}'.",
         })
+    except AhaError as e:
+        raise_tool_error(e)
     except Exception as e:
-        return _format_output({"error": f"Failed to upload attachment: {e}"})
+        raise ToolError(f"Failed to upload attachment: {e}") from e
 
 
 # ===================================================================
@@ -952,9 +1016,11 @@ async def aha_my_work(
 
     Returns a unified view grouped by type, sorted by due date.
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
+
+    # --- Task 3: Resolve "me" / None to current user ---
+    if not assignee or assignee.lower() == "me":
+        assignee = await _resolve_current_user(ctx)
 
     # Build parallel queries for each work type
     feature_fields = _fields_for("feature", response_format)
@@ -1051,9 +1117,7 @@ async def aha_recent_activity(
 
     Returns recently created and updated records, grouped by type.
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     days = min(days, 30)
     since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00Z")
@@ -1128,26 +1192,24 @@ async def aha_introspect(
       aha_introspect("type", type_name="Feature")
       aha_introspect("search", search_term="create")
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     if query_type == "overview":
         return await _introspect_overview(search_term, ctx)
     elif query_type == "type":
         if not type_name:
-            return _format_output({
-                "error": "type_name required when query_type='type'.",
-                "example": 'aha_introspect("type", type_name="Feature")',
-            })
+            raise ToolError(
+                "type_name required when query_type='type'.\n"
+                'Example: aha_introspect("type", type_name="Feature")'
+            )
         return await _introspect_type(type_name, ctx)
     elif query_type == "search":
         return await _introspect_search(search_term, ctx)
     else:
-        return _format_output({
-            "error": f"Invalid query_type: '{query_type}'.",
-            "hint": "Use 'overview', 'type', or 'search'.",
-        })
+        raise tool_error_from_message(
+            f"Invalid query_type: '{query_type}'.",
+            hint="Use 'overview', 'type', or 'search'.",
+        )
 
 
 @cached(ttl_seconds=300)
@@ -1189,10 +1251,10 @@ async def _introspect_type(type_name: str, ctx: Context) -> str:
     type_info = data.get("__type")
 
     if not type_info:
-        return _format_output({
-            "error": f"Type '{type_name}' not found.",
-            "hint": "Use aha_introspect('overview') to list available types.",
-        })
+        raise tool_error_from_message(
+            f"Type '{type_name}' not found.",
+            hint="Use aha_introspect('overview') to list available types.",
+        )
 
     # Truncate long field lists
     for key in ("fields", "inputFields"):
