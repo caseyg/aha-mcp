@@ -16,9 +16,7 @@ Based on the original TypeScript MCP server by Aha! but rewritten in Python with
 - `fastmcp run aha_mcp.py` -- Run via FastMCP CLI
 
 ### Testing
-- `pytest test_tools.py -v` -- Run the new tool tests (primary test suite)
-- `pytest test_aha_mcp.py -v` -- Run legacy tests (tests the old `aha-mcp.py` entry point)
-- `pytest -v` -- Run all tests
+- `pytest test_tools.py -v` -- Run the tool tests (primary test suite)
 - `pytest test_tools.py -k "test_aha_get"` -- Run a specific test
 
 ### Development Requirements
@@ -33,7 +31,6 @@ Based on the original TypeScript MCP server by Aha! but rewritten in Python with
 
 ```
 aha_mcp.py       -- Entry point. Creates FastMCP instance, registers tools/prompts/resources/oauth.
-aha-mcp.py       -- LEGACY entry point (78-tool era). Still works but uses old tool registration.
 client.py        -- Shared httpx.AsyncClient with connection pooling (20 connections),
                     30s timeout, retry on 429/503 with exponential backoff.
                     Exports: graphql(ctx, query, variables), rest_api(ctx, method, endpoint, ...),
@@ -52,8 +49,6 @@ cache.py         -- TTL cache with @cached decorator. Used for introspection (5m
 prompts.py       -- 10 MCP prompts for common workflows (backlog analysis, release planning, etc.)
 resources.py     -- 4 MCP resources: releases by status, ideas by filter, assigned work, recent updates.
 oauth.py         -- OAuth 2.0 discovery, authorization, token endpoints.
-utils.py         -- LEGACY utilities from the 78-tool era. Contains CrudTemplates,
-                    build_list_query, execute_mutation, etc. Retained but not used by new tools.
 ```
 
 ### Key Design Patterns
@@ -86,16 +81,6 @@ utils.py         -- LEGACY utilities from the 78-tool era. Contains CrudTemplate
 - Initiatives: `PROJ-IN-2`
 - Goals: `PROJ-G-7`
 - Pages: `PROJ-N-12`
-
-## Known Issues
-
-### Resources Bug
-`resources.py` still uses the old `check_auth()` pattern (expects it to return a string) rather than the new pattern (raises `AhaAuthError`). Also has the indentation bug in `releases_by_status` where `feature_stats` is only computed for "active" releases.
-
-### Legacy Files
-- `aha-mcp.py`: Old entry point with dual resource registration. Superseded by `aha_mcp.py`.
-- `utils.py`: Old utilities with `require_auth` decorator, `CrudTemplates`, etc. Not used by new tools.
-- `test_aha_mcp.py`: Tests for the old 78-tool architecture. `test_tools.py` is the current test suite.
 
 ## Research Docs
 - `docs/simplified-tool-design.md` -- Design spec for the 10-tool architecture

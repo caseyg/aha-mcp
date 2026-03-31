@@ -20,29 +20,24 @@
 - [x] 4 MCP resources (releases, ideas, assigned work, recent updates)
 - [x] OAuth 2.0 support with discovery endpoints
 
-## P0: Critical Bugs to Fix
+## Completed Bug Fixes
 
-- [ ] **Call signature mismatch**: tools.py/resources.py/utils.py call `graphql(ctx, query, vars)` but client.py defines `graphql(query, vars, ctx)`. Same for rest_api. Tests pass only because mocks bypass the real client.
-- [ ] **format_response_field type error**: `tools.py:_format_output()` passes dict/list to `formatting.py:format_response_field()` which expects str. Needs recursive field conversion.
-- [ ] **resources.py check_auth pattern**: Still uses old pattern (expects return value) but new client.py raises exceptions. Also has indentation bug where feature_stats only computed for "active" releases.
-- [ ] **resources.py bare except**: `ideas_by_filter` line 256 has bare `except:` that swallows KeyboardInterrupt.
-- [ ] **OAuth security**: XSS in error page (oauth.py reflects client_id into HTML), no state validation in callback, no token expiry on oauth_states.
-
-## P1: Code Quality
-
-- [ ] **Remove legacy files**: Delete or archive `aha-mcp.py`, `test_aha_mcp.py`, `run_tests.sh`. Update `pytest.ini` to point at `test_tools.py`.
-- [ ] **Fix resources.py to use new patterns**: Use exception-based auth, use new client.py call signatures, parallelize queries with asyncio.gather().
-- [ ] **Fix utils.py or remove it**: Currently has stale imports and call signatures. Either update to match new client.py or remove (new tools.py doesn't use it).
-- [ ] **Improve _format_output**: Add recursive HTML-to-Markdown conversion for nested dicts/lists before JSON serialization.
-- [ ] **aha_my_work uses f-string filters**: Lines 938-941 use inline f-string GraphQL filter construction instead of parameterized variables. Potential injection.
-- [ ] **aha_recent_activity uses f-string filters**: Line 1028 uses f-string for project_filter and since date.
+- [x] **Fixed call signature mismatch**: resolver.py now calls `graphql(ctx, query, vars)` and `rest_api(ctx, method, endpoint)` matching client.py signatures.
+- [x] **Fixed resources.py check_auth pattern**: Now uses try/except AhaAuthError instead of old return-value pattern.
+- [x] **Fixed resources.py indentation bug**: `feature_stats` computation now runs for ALL releases, not just "active" ones.
+- [x] **Fixed resources.py tags kwarg**: Removed unsupported `tags=` kwarg from resource registration (FastMCP 3.x).
+- [x] **Fixed OAuth security**: HTML-escaped `client_id` and error params to prevent XSS, replaced `str(e)` with generic error message, added 10-minute state TTL with expiry check.
+- [x] **Fixed OAuth shared client**: oauth.py now uses `get_client()` from client.py instead of creating its own httpx clients.
+- [x] **Fixed f-string injection in aha_my_work**: Converted to parameterized $variables for GraphQL queries.
+- [x] **Fixed f-string injection in aha_recent_activity**: Converted to parameterized $variables for GraphQL queries.
+- [x] **Wired status/tags into aha_search**: `status` and `tags` parameters now included in GraphQL filter variables.
+- [x] **Removed legacy files**: Deleted `aha-mcp.py`, `utils.py`, `test_aha_mcp.py`. Updated pytest.ini to discover only `test_tools.py`.
 
 ## P2: Feature Gaps (from simplified-tool-design.md)
 
 - [ ] **Name-based identifier resolution for aha_create**: The `project` and `release` params accept IDs but not names. Should resolve "Q3 Release" -> release ID.
 - [ ] **"me" / current user support in aha_my_work**: Design spec says "defaults to authenticated user" but implementation requires explicit email/ID.
 - [ ] **Helpful not-found errors**: Design spec says errors should suggest similar records (e.g., "Did you mean PROJ-99?"). Current errors just say "not found".
-- [ ] **Filter parameters on aha_search**: `status` and `tags` filters are accepted as parameters but not actually wired into the GraphQL query.
 
 ## P3: MCP Best Practices Still Missing
 
