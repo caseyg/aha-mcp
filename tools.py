@@ -12,8 +12,13 @@ from typing import Any, Dict, List, Optional
 
 from fastmcp import Context, FastMCP
 
+from fastmcp.exceptions import ToolError
+
 from client import check_auth, graphql, rest_api
-from errors import AhaError, AhaNotFoundError, AhaValidationError
+from errors import (
+    AhaError, AhaNotFoundError, AhaValidationError,
+    raise_tool_error, tool_error_from_message,
+)
 from formatting import format_description, format_response_field
 from resolver import detect_record_type, resolve_identifier
 from cache import cached
@@ -149,16 +154,11 @@ REQUIRES_PROJECT = {"feature", "idea", "epic", "release", "page", "requirement"}
 # ---------------------------------------------------------------------------
 
 def _require_auth():
-    """Return error string if auth is missing, else None.
-
-    Bridges the old return-based pattern used by tool functions with the
-    new exception-based check_auth() in client.py.
-    """
+    """Check auth, raising ToolError if credentials are missing."""
     try:
         check_auth()
-        return None
-    except Exception as e:
-        return _format_output({"error": str(e)})
+    except AhaError as e:
+        raise_tool_error(e)
 
 
 def _fields_for(record_type: str, response_format: str) -> str:
@@ -333,16 +333,12 @@ async def aha_get(
     response_format: "detailed" (all fields) or "concise" (name, status, assignee only).
     content_format: "markdown" (converts HTML descriptions to Markdown) or "html" (raw).
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     try:
         resolved = await resolve_identifier(identifier, record_type, ctx)
-    except AhaNotFoundError as e:
-        return _format_output({"error": str(e)})
     except AhaError as e:
-        return _format_output({"error": str(e)})
+        raise_tool_error(e)
 
     # If resolver returned multiple matches, return them for disambiguation
     if isinstance(resolved, dict) and "matches" in resolved:
@@ -354,10 +350,10 @@ async def aha_get(
     gql_name = GQL_SINGULAR.get(rtype)
 
     if not gql_name:
-        return _format_output({
-            "error": f"Unknown record type: '{rtype}'.",
-            "hint": f"Supported types: {', '.join(GQL_SINGULAR.keys())}",
-        })
+        raise tool_error_from_message(
+            f"Unknown record type: '{rtype}'.",
+            hint=f"Supported types: {', '.join(GQL_SINGULAR.keys())}",
+        )
 
     query = f"""query($id: ID!) {{
         {gql_name}(id: $id) {{ {fields} }}
@@ -365,15 +361,17 @@ async def aha_get(
 
     try:
         data = await graphql(ctx, query, {"id": record_id})
+    except AhaError as e:
+        raise_tool_error(e)
     except Exception as e:
-        return _format_output({"error": f"Failed to fetch {rtype} '{identifier}': {e}"})
+        raise ToolError(f"Failed to fetch {rtype} '{identifier}': {e}") from e
 
     result = data.get(gql_name)
     if not result:
-        return _format_output({
-            "error": f"Record '{identifier}' not found.",
-            "hint": 'Try aha_search(query="...") to find records by name.',
-        })
+        raise ToolError(
+            f"Record '{identifier}' not found.\n"
+            f'Hint: Try aha_search(query="...") to find records by name.'
+        )
 
     return _format_output(result, content_format)
 
@@ -416,9 +414,7 @@ async def aha_search(
       aha_search(record_type="idea", project="PROJ", status="New")
       aha_search(record_type="project")
     """
-    auth_error = _require_auth()
-    if auth_error:
-        return auth_error
+    _require_auth()
 
     per_page = min(per_page, 100)
 
@@ -442,10 +438,10 @@ async def aha_search(
     rtype = record_type or "feature"
     plural = GQL_PLURAL.get(rtype)
     if not plural:
-        return _format_output({
-            "error": f"Cannot list record type '{rtype}'.",
-            "hint": f"Supported: {', '.join(GQL_PLURAL.keys())}",
-        })
+        raise tool_error_from_message(
+            f"Cannot list record type '{rtype}'.",
+            hint=f"Supported: {', '.join(GQL_PLURAL.keys())}",
+        )
 
     fields = _fields_for(rtype, response_format)
 
@@ -478,7 +474,7 @@ async def aha_search(
 
     try:
         data = await graphql(ctx, gql_query_simple)
-    except Exception as e:
+    except Exception:
         # If simple inline query fails, try parameterized version
         try:
             data = await graphql(ctx, gql_query, {
@@ -486,8 +482,10 @@ async def aha_search(
                 "page": page,
                 "per": per_page,
             })
+        except AhaError as e2:
+            raise_tool_error(e2)
         except Exception as e2:
-            return _format_output({"error": f"Search failed: {e2}"})
+            raise ToolError(f"Search failed: {e2}") from e2
 
     result = data.get(plural, {})
     nodes = result.get("nodes", [])
@@ -540,8 +538,10 @@ async def _text_search(
 
     try:
         data = await graphql(ctx, gql, {"filters": filters, "page": page, "per": per_page})
+    except AhaError as e:
+        raise_tool_error(e)
     except Exception as e:
-        return _format_output({"error": f"Search failed: {e}"})
+        raise ToolError(f"Search failed: {e}") from e
 
     result = data.get("searchDocuments", {})
     nodes = result.get("nodes", [])

@@ -1,4 +1,10 @@
-"""MCP-native error handling for Aha! MCP operations."""
+"""MCP-native error handling for Aha! MCP operations.
+
+Uses ``fastmcp.exceptions.ToolError`` so FastMCP returns proper MCP error
+responses (``isError=True``) instead of the tool returning JSON error strings.
+"""
+
+from fastmcp.exceptions import ToolError
 
 
 class AhaError(Exception):
@@ -42,3 +48,20 @@ def format_error(error: AhaError) -> str:
     if error.suggestion:
         parts.append(error.suggestion)
     return "\n".join(parts)
+
+
+def raise_tool_error(error: AhaError) -> None:
+    """Convert an AhaError into a ToolError and raise it.
+
+    This bridges the domain error hierarchy with FastMCP's ToolError so that
+    tool functions can let domain exceptions propagate as proper MCP errors.
+    """
+    raise ToolError(format_error(error)) from error
+
+
+def tool_error_from_message(message: str, hint: str | None = None) -> ToolError:
+    """Create a ToolError with an optional hint line."""
+    parts = [message]
+    if hint:
+        parts.append(f"Hint: {hint}")
+    return ToolError("\n".join(parts))
