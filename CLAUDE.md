@@ -4,166 +4,108 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Python implementation of an MCP (Model Context Protocol) server for Aha! using FastMCP 2.0. It aims to provide a comprehensive interface to Aha!'s GraphQL and REST APIs with additional features beyond the original implementation.
+Python MCP server for Aha! using FastMCP 2.0. Recently refactored from 78 endpoint-per-tool wrappers to 10 unified tools following Anthropic's [Writing Tools for Agents](https://www.anthropic.com/engineering/writing-tools-for-agents) guidelines.
 
-This implementation is based on the original TypeScript MCP server by Aha! but has been rewritten in Python using the FastMCP framework for better maintainability and enhanced functionality.
+Based on the original TypeScript MCP server by Aha! but rewritten in Python with significantly broader API coverage and a simplified tool surface.
 
 ## Commands
 
 ### Build and Run
-- `pip install -r requirements.txt` - Install Python dependencies
-- `python aha-mcp.py` - Run the server directly
-- `fastmcp run aha-mcp.py --transport http` - Run with FastMCP CLI
+- `pip install -r requirements.txt` -- Install dependencies
+- `python aha_mcp.py` -- Run the server (stdio transport)
+- `fastmcp run aha_mcp.py` -- Run via FastMCP CLI
 
 ### Testing
-- `pytest test_aha_mcp.py` - Run test suite
-- `pytest test_aha_mcp.py -v` - Run tests with verbose output
-- `pytest test_aha_mcp.py -k "test_name"` - Run specific test
-- `pytest test_aha_mcp.py --cov=aha-mcp` - Run with coverage (if coverage installed)
-
-### Transport Options
-- **HTTP (only)**: `fastmcp run aha-mcp.py --transport http`
-  - Runs on port 8000 by default
-  - Provides OAuth discovery endpoints when OAuth credentials are configured
-  - Note: SSE transport not available in Python implementation
+- `pytest test_tools.py -v` -- Run the new tool tests (primary test suite)
+- `pytest test_aha_mcp.py -v` -- Run legacy tests (tests the old `aha-mcp.py` entry point)
+- `pytest -v` -- Run all tests
+- `pytest test_tools.py -k "test_aha_get"` -- Run a specific test
 
 ### Development Requirements
-- Python 3.10 or higher required
+- Python 3.10+
 - FastMCP 2.0 framework
-- Dependencies: `fastmcp>=2.0.0`, `httpx`, `pytest`, `pytest-asyncio`, `python-dotenv`
-- Test framework: pytest with async support
-
-## Authentication Setup
-
-The server supports two authentication methods:
-
-### Option 1: API Token (Default)
-1. Get your API token from Aha! (Settings → Personal → API)
-2. Set environment variables:
-   ```bash
-   export AHA_API_TOKEN="your-api-token"
-   export AHA_DOMAIN="yourcompany"
-   ```
-
-### Option 2: OAuth2 (MCP-compliant)
-1. Register an OAuth application in Aha!:
-   - Go to Settings → Account → OAuth applications
-   - Create a new application
-   - Set redirect URL to match OAUTH_REDIRECT_URI (default: http://localhost:3000/oauth/callback)
-2. Set environment variables:
-   ```bash
-   export OAUTH_CLIENT_ID="your-client-id"
-   export OAUTH_CLIENT_SECRET="your-client-secret"
-   export OAUTH_REDIRECT_URI="http://localhost:3000/oauth/callback"  # optional
-   ```
-3. When using OAuth, you'll need to authenticate first:
-   - In OAuth mode, use the `auth_login` tool to get an authorization URL
-   - Open the URL in your browser and authorize the application
-   - The server will handle the callback and store your token
-
-#### OAuth Implementation Details
-- **PKCE Support**: Uses S256 code challenge method for enhanced security
-- **Resource Indicators**: Implements RFC 8707 for token audience binding
-- **Protected Resource Metadata**: Exposes `/.well-known/oauth-protected-resource` endpoint
-- **WWW-Authenticate Headers**: Returns proper 401 responses with resource metadata
-- **Token Validation**: Validates tokens are intended for this specific MCP server
+- Dependencies: `fastmcp>=2.0.0`, `httpx`, `python-dotenv`, `markdown>=3.5`, `markdownify>=0.13`, `starlette`, `uvicorn`, `authlib`
+- Test dependencies: `pytest>=7.0.0`, `pytest-asyncio>=0.21.0`, `pytest-mock>=3.10.0`
 
 ## Architecture
 
-### Python Implementation (aha-mcp.py)
-- **Single file**: `aha-mcp.py` - Complete implementation using FastMCP 2.0
-- **Test file**: `test_aha_mcp.py` - Comprehensive pytest test suite
-- **Framework**: FastMCP 2.0 provides MCP protocol handling and OAuth discovery
-- **API Integration**: Hybrid approach using GraphQL for most operations, REST API for unsupported features
-- **Authentication**: Centralized auth handling with support for both API tokens and OAuth2
-- **Error Handling**: Consistent error messages with proper MCP error codes
+### Module Map
 
-### Key Architectural Decisions
-1. **FastMCP Framework**: Simplifies MCP protocol implementation significantly
-2. **Single File Design**: All server logic in one file for easier maintenance
-3. **Stateless Operation**: No persistent storage, suitable for serverless deployment
-4. **Hybrid API Approach**: GraphQL primary, REST fallback for missing operations
-5. **Comprehensive Testing**: Full test coverage with mocked GraphQL responses
+```
+aha_mcp.py       -- Entry point. Creates FastMCP instance, registers tools/prompts/resources/oauth.
+aha-mcp.py       -- LEGACY entry point (78-tool era). Still works but uses old tool registration.
+client.py        -- Shared httpx.AsyncClient with connection pooling (20 connections),
+                    30s timeout, retry on 429/503 with exponential backoff.
+                    Exports: graphql(query, variables, ctx), rest_api(method, endpoint, ...),
+                    check_auth(), get_auth_headers(), close_client(), oauth_tokens.
+tools.py         -- 10 unified tools: aha_get, aha_search, aha_create, aha_update,
+                    aha_delete, aha_promote_idea, aha_upload_attachment, aha_my_work,
+                    aha_recent_activity, aha_introspect.
+resolver.py      -- Flexible identifier resolution. Accepts reference numbers (PROJ-123),
+                    names ("Q3 Planning"), or numeric IDs. Resolves via pattern matching,
+                    GraphQL lookup, or search API.
+formatting.py    -- Bidirectional Markdown <-> HTML conversion using markdown + markdownify.
+                    Auto-detects input format via HTML tag heuristic.
+errors.py        -- Error hierarchy: AhaError -> AhaAuthError, AhaNotFoundError,
+                    AhaValidationError, AhaApiError. Each carries message + suggestion.
+cache.py         -- TTL cache with @cached decorator. Used for introspection (5min TTL).
+prompts.py       -- 10 MCP prompts for common workflows (backlog analysis, release planning, etc.)
+resources.py     -- 4 MCP resources: releases by status, ideas by filter, assigned work, recent updates.
+oauth.py         -- OAuth 2.0 discovery, authorization, token endpoints.
+utils.py         -- LEGACY utilities from the 78-tool era. Contains CrudTemplates,
+                    build_list_query, execute_mutation, etc. Retained but not used by new tools.
+```
 
-### MCP Tools Exposed
+### Key Design Patterns
 
-1. `get_record` - Fetches features (DEVELOP-123), requirements (ADT-123-1), or ideas (ABC-I-123)
-2. `get_page` - Fetches pages (ABC-N-213) with optional parent info
-3. `search_documents` - Searches Aha! documents by query and type
-4. `create_feature` - Creates new features in a release
-5. `update_feature` - Updates existing feature properties
-6. `delete_feature` - Deletes a feature
-7. `list_features` - Lists features with filtering options
-8. `get_feature_details` - Gets comprehensive feature information
-9. `get_idea` - Fetches an idea by ID or reference (ABC-I-123)
-10. `list_ideas` - Lists ideas for a project with filtering options
-11. `create_idea` - Creates new ideas in a project
-12. `update_idea` - Updates existing idea properties (limited by GraphQL API)
-13. `delete_idea` - Deletes an idea (uses REST API)
-14. `introspection` - Performs GraphQL introspection to explore the API schema
-    - Supports generic type exploration with `queryType: "type"` and `typeName: "ModelName"`
-    - Can search for specific queries/mutations with `searchTerm`
-    - Examples: explore "Idea" type, search for "create" mutations, find "idea" queries
+1. **One tool per CRUD verb**: `aha_get`, `aha_search`, `aha_create`, `aha_update`, `aha_delete` handle all record types via `record_type` parameter.
+2. **Flexible identifier resolution**: `resolver.py` accepts any identifier format. Pattern-based detection for references, search API fallback for names.
+3. **GraphQL field fragments**: `CONCISE_FIELDS` and `DETAILED_FIELDS` dicts in `tools.py` define per-type field sets. `response_format` parameter selects between them.
+4. **Tool annotations**: All tools registered with `readOnlyHint` and `destructiveHint` annotations.
+5. **`asyncio.gather()`**: Composite tools (`aha_my_work`, `aha_recent_activity`) run parallel GraphQL queries.
+6. **@cached decorator**: `cache.py` provides TTL caching for introspection queries.
 
-### Environment Variables
+### Authentication
+- **API Token**: Set `AHA_API_TOKEN` and `AHA_DOMAIN` env vars.
+- **OAuth**: Set `OAUTH_CLIENT_ID`, `OAUTH_CLIENT_SECRET`. Exposes discovery endpoints at `/.well-known/oauth-authorization-server`.
+- Auth check: `client.py:check_auth()` raises `AhaAuthError` if no credentials.
+- Auth headers: `client.py:get_auth_headers(ctx)` resolves per-user OAuth > API token > fallback.
 
-#### For API Token Authentication (Option 1)
-Required:
-- `AHA_API_TOKEN` - Authentication token for Aha! API
-- `AHA_DOMAIN` - Aha! domain (e.g., "yourcompany")
-
-#### For OAuth2 Authentication (Option 2)
-Required:
-- `OAUTH_CLIENT_ID` - OAuth application client ID
-- `OAUTH_CLIENT_SECRET` - OAuth application client secret
-
-Optional:
-- `OAUTH_REDIRECT_URI` - OAuth callback URL (default: http://localhost:3000/oauth/callback)
-- `AHA_DOMAIN` - Default Aha! domain for OAuth (optional)
-
-#### General Configuration
-Optional:
-- `LOG_LEVEL` - Logging level (default: info)
-- `PORT` - Port for HTTP transport (default: 8000)
+### API Client (client.py)
+- **Shared httpx.AsyncClient**: Lazy-created singleton with connection pooling.
+- **graphql(query, variables, ctx)**: Parameterized queries only. Raises on GraphQL errors.
+- **rest_api(method, endpoint, data, params, ...)**: REST fallback. Auto-prefixes `/api/v1`.
+- **Retry**: 429/503 retried up to 3 times with exponential backoff.
 
 ### Reference Number Formats
-- Features: `/^[A-Z0-9]+-\d+$/` (e.g., DEVELOP-123)
-- Requirements: `/^[A-Z0-9]+-\d+-\d+$/` (e.g., ADT-123-1)
-- Pages: `/^[A-Z0-9]+-N-\d+$/` (e.g., ABC-N-213)
-- Ideas: `/^[A-Z0-9]+-I-\d+$/` (e.g., ABC-I-123)
+- Features: `PROJ-123`
+- Requirements: `PROJ-123-1`
+- Ideas: `PROJ-I-45`
+- Epics: `PROJ-E-1`
+- Releases: `PROJ-R-3`
+- Initiatives: `PROJ-IN-2`
+- Goals: `PROJ-G-7`
+- Pages: `PROJ-N-12`
 
-## Key Development Notes
+## Known Issues
 
-- Uses FastMCP 2.0 framework for simplified MCP implementation
-- Async/await pattern throughout with `httpx` for HTTP requests
-- Centralized error handling with RuntimeError for GraphQL errors
-- Single-file architecture reduces complexity
-- Tests use pytest with mocked GraphQL responses
-- OAuth token mapping stored in-memory (stateless design)
-- All errors use appropriate MCP error codes (InvalidParams, InternalError)
-- GraphQL requests handled via centralized `graphql()` function
-- REST API used sparingly for operations not supported by GraphQL
+### Call Signature Mismatch (CRITICAL)
+`tools.py`, `resources.py`, and `utils.py` call `graphql(ctx, query, variables)` and `rest_api(ctx, method, endpoint, data)` but `client.py` defines `graphql(query, variables, ctx)` and `rest_api(method, endpoint, data, params, use_form_data, ctx)`. The argument order is reversed. Tests pass because they mock at the `tools.graphql` level, bypassing the real client. This must be fixed before production use.
 
-### Documentation Structure
-- `README.md` - User-facing documentation with setup instructions
-- `TODO.md` - Implementation roadmap and API comparison table
-- `docs/` - Reference documentation including:
-  - `aha-rest-api/` - REST API endpoint documentation
-  - `fastmcp/` - FastMCP framework documentation
+### Resources Bug
+`resources.py` still uses the old `check_auth()` pattern (expects it to return a string) rather than the new pattern (raises `AhaAuthError`). Also has the indentation bug in `releases_by_status` where `feature_stats` is only computed for "active" releases.
 
-## Known Limitations and Future Work
+### format_response_field Type Mismatch
+`tools.py:_format_output()` calls `format_response_field(data)` with a dict/list, but `formatting.py:format_response_field()` expects a string. This will fail at runtime when `content_format="markdown"`.
 
-### GraphQL API Limitations
-Some operations are not supported via GraphQL and require REST API:
-- **Idea scores and tags**: Updates only available via REST
-- **File attachments**: Upload/management only via REST
-- **User management**: CRUD operations only via REST
-- **Comment updates/deletes**: Only creation available in GraphQL
+### Legacy Files
+- `aha-mcp.py`: Old entry point with dual resource registration. Superseded by `aha_mcp.py`.
+- `utils.py`: Old utilities with `require_auth` decorator, `CrudTemplates`, etc. Not used by new tools.
+- `test_aha_mcp.py`: Tests for the old 78-tool architecture. `test_tools.py` is the current test suite.
 
-### Planned Enhancements (See TODO.md for details)
-1. **REST API Integration**: Add REST client for unsupported GraphQL operations
-2. **MCP Prompts**: Add predefined prompts for common workflows
-3. **MCP Resources**: Expose Aha! data as resources (releases, backlog, etc.)
-4. **Additional Endpoints**: Releases, epics, requirements, users, workflows, custom fields
-
-Refer to TODO.md for the comprehensive GraphQL vs REST API comparison table and implementation priorities.
+## Research Docs
+- `docs/simplified-tool-design.md` -- Design spec for the 10-tool architecture
+- `docs/mcp-server-best-practices.md` -- MCP best practices research
+- `docs/codebase-analysis.md` -- Analysis of the old 78-tool codebase
+- `docs/competitive-analysis.md` -- Comparison with other Aha! MCP servers
+- `docs/refactor-plan.md` -- Phased refactoring plan

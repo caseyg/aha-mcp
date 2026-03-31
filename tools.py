@@ -149,8 +149,16 @@ REQUIRES_PROJECT = {"feature", "idea", "epic", "release", "page", "requirement"}
 # ---------------------------------------------------------------------------
 
 def _require_auth():
-    """Return error string if auth is missing, else None."""
-    return check_auth()
+    """Return error string if auth is missing, else None.
+
+    Bridges the old return-based pattern used by tool functions with the
+    new exception-based check_auth() in client.py.
+    """
+    try:
+        check_auth()
+        return None
+    except Exception as e:
+        return _format_output({"error": str(e)})
 
 
 def _fields_for(record_type: str, response_format: str) -> str:
@@ -162,8 +170,25 @@ def _fields_for(record_type: str, response_format: str) -> str:
 def _format_output(data: Any, content_format: str = "markdown") -> str:
     """Serialize result to JSON, converting HTML descriptions to Markdown if requested."""
     if content_format == "markdown" and isinstance(data, (dict, list)):
-        data = format_response_field(data)
+        data = _convert_html_fields(data)
     return json.dumps(data, indent=2, default=str)
+
+
+def _convert_html_fields(obj: Any) -> Any:
+    """Recursively convert htmlBody fields from HTML to Markdown in a data structure."""
+    if isinstance(obj, dict):
+        result = {}
+        for k, v in obj.items():
+            if k == "htmlBody" and isinstance(v, str):
+                result[k] = format_response_field(v, "markdown")
+            elif isinstance(v, (dict, list)):
+                result[k] = _convert_html_fields(v)
+            else:
+                result[k] = v
+        return result
+    elif isinstance(obj, list):
+        return [_convert_html_fields(item) for item in obj]
+    return obj
 
 
 def _mutation_error(result: dict) -> Optional[str]:

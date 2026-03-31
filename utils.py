@@ -240,10 +240,6 @@ def build_standard_fields(resource_name: str) -> List[str]:
             "parent { id referenceNum name }",
             "createdAt", "createdByUser { id name }"
         ],
-        "requirement": base_fields + [
-            "description { htmlBody }",
-            "feature { id referenceNum name }"
-        ],
         "comment": [
             "id", "body { htmlBody }",
             "createdAt", "updatedAt",

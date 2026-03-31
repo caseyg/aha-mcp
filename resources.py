@@ -253,7 +253,7 @@ async def ideas_by_filter(filter: str = "review", ctx: Optional[Context] = None)
                     created_at = datetime.fromisoformat(idea["createdAt"].replace('Z', '+00:00'))
                     if created_at.replace(tzinfo=None) >= seven_days_ago:
                         filtered_ideas.append(idea)
-                except:
+                except (ValueError, KeyError, AttributeError):
                     pass
         else:  # filter == "all"
             filtered_ideas = all_ideas

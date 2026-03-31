@@ -54,7 +54,7 @@ async def test_client(mock_env):
          patch("tools.check_auth", return_value=None), \
          patch("tools.resolve_identifier", new_callable=AsyncMock) as mock_resolver, \
          patch("tools.detect_record_type") as mock_detect, \
-         patch("tools.format_response_field", side_effect=lambda x: x):
+         patch("tools.format_response_field", side_effect=lambda x, *a, **kw: x):
         # Default: resolve_identifier returns a dict with id and _type
         mock_resolver.return_value = {"id": "111", "_type": "feature", "reference": "PROJ-123"}
         mock_detect.return_value = "feature"

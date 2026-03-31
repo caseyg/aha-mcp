@@ -1,67 +1,69 @@
-# Aha! MCP Server - TODO
+# Aha! MCP Server -- TODO
 
-## Current Status
+## Completed in Rewrite (research/mcp-best-practices branch)
 
-**Completed:**
-- ✅ 78 high-priority tools implemented
-- ✅ 10 MCP prompts for common workflows
-- ✅ OAuth2 authentication support
-- ✅ FastMCP 2.0 migration
-- ⚠️  Basic test suite (27 tests for ~25% coverage)
+- [x] Consolidated 78 tools to 10 unified tools (aha_get, aha_search, aha_create, aha_update, aha_delete, aha_promote_idea, aha_upload_attachment, aha_my_work, aha_recent_activity, aha_introspect)
+- [x] Flexible identifier resolution (reference, name, or ID) via resolver.py
+- [x] Bidirectional Markdown <-> HTML conversion via formatting.py
+- [x] MCP-native error hierarchy (errors.py: AhaAuthError, AhaNotFoundError, etc.)
+- [x] Shared httpx.AsyncClient with connection pooling, timeout, retry (client.py)
+- [x] Parameterized GraphQL queries (no f-string injection)
+- [x] TTL cache for introspection queries (cache.py, @cached decorator)
+- [x] Tool annotations (readOnlyHint, destructiveHint) on all 10 tools
+- [x] response_format parameter (concise/detailed) on read tools
+- [x] content_format parameter (markdown/html) for description handling
+- [x] asyncio.gather() for composite tools (aha_my_work, aha_recent_activity)
+- [x] Pagination cap (per_page max 100) with truncation hints
+- [x] New entry point aha_mcp.py (replaces aha-mcp.py)
+- [x] Comprehensive test suite for new tools (test_tools.py)
+- [x] 10 MCP prompts for common workflows
+- [x] 4 MCP resources (releases, ideas, assigned work, recent updates)
+- [x] OAuth 2.0 support with discovery endpoints
 
-**In Progress:**
-- 🚧 4 MCP resources (implemented but not visible in Claude)
+## P0: Critical Bugs to Fix
 
-## Remaining Work
+- [ ] **Call signature mismatch**: tools.py/resources.py/utils.py call `graphql(ctx, query, vars)` but client.py defines `graphql(query, vars, ctx)`. Same for rest_api. Tests pass only because mocks bypass the real client.
+- [ ] **format_response_field type error**: `tools.py:_format_output()` passes dict/list to `formatting.py:format_response_field()` which expects str. Needs recursive field conversion.
+- [ ] **resources.py check_auth pattern**: Still uses old pattern (expects return value) but new client.py raises exceptions. Also has indentation bug where feature_stats only computed for "active" releases.
+- [ ] **resources.py bare except**: `ideas_by_filter` line 256 has bare `except:` that swallows KeyboardInterrupt.
+- [ ] **OAuth security**: XSS in error page (oauth.py reflects client_id into HTML), no state validation in callback, no token expiry on oauth_states.
 
-### 1. Improve Test Coverage
-- Current: ~27 tests covering only basic functionality
-- Needed: Tests for remaining ~80 tools
-- Priority areas: Tasks, Key Results, Record Links, Release Phases, Idea Votes
+## P1: Code Quality
 
-### 2. Fix MCP Resources (In Progress)
-**Current Status:** Resources implemented but not visible in Claude interface
+- [ ] **Remove legacy files**: Delete or archive `aha-mcp.py`, `test_aha_mcp.py`, `run_tests.sh`. Update `pytest.ini` to point at `test_tools.py`.
+- [ ] **Fix resources.py to use new patterns**: Use exception-based auth, use new client.py call signatures, parallelize queries with asyncio.gather().
+- [ ] **Fix utils.py or remove it**: Currently has stale imports and call signatures. Either update to match new client.py or remove (new tools.py doesn't use it).
+- [ ] **Improve _format_output**: Add recursive HTML-to-Markdown conversion for nested dicts/lists before JSON serialization.
+- [ ] **aha_my_work uses f-string filters**: Lines 938-941 use inline f-string GraphQL filter construction instead of parameterized variables. Potential injection.
+- [ ] **aha_recent_activity uses f-string filters**: Line 1028 uses f-string for project_filter and since date.
 
-**Completed:**
-- ✅ Created resources.py with 4 resource implementations
-- ✅ Resources use parameterized URIs (required by FastMCP 2.0)
-- ✅ Registered using @mcp.resource decorator in aha-mcp.py
+## P2: Feature Gaps (from simplified-tool-design.md)
 
-**Issues to Resolve:**
-- Resources not appearing in Claude @ mentions interface
-- Need to debug visibility/registration issue
+- [ ] **Name-based identifier resolution for aha_create**: The `project` and `release` params accept IDs but not names. Should resolve "Q3 Release" -> release ID.
+- [ ] **"me" / current user support in aha_my_work**: Design spec says "defaults to authenticated user" but implementation requires explicit email/ID.
+- [ ] **Helpful not-found errors**: Design spec says errors should suggest similar records (e.g., "Did you mean PROJ-99?"). Current errors just say "not found".
+- [ ] **Filter parameters on aha_search**: `status` and `tags` filters are accepted as parameters but not actually wired into the GraphQL query.
 
-**Next Steps:**
-1. Debug why resources aren't showing in Claude interface
-2. Test resource functionality once visible
-3. Add resource caching for performance
+## P3: MCP Best Practices Still Missing
 
-### 3. Tools to Implement (100+ tools remaining)
-- **API Rate Limits** (2): get current usage, get limits
-- **Audits** (3): list audit events, get audit details, export audit logs
-- **Automation Rules** (5): list, create, update, delete, test automation rules
-- **Backups** (3): list, create, restore backups
-- **Capacity Management** (5): list, create, get, update, delete capacity investments
-- **Competitors** (5): list, create, get, update, delete competitors
-- **Creative Briefs** (5): list, create, get, update, delete creative briefs
-- **Current User** (3): get current user, list assigned records, list pending tasks
-- **Custom Field Options** (4): list, create, update, delete dropdown options
-- **Custom Layouts** (4): list, create, update, delete UI layouts
-- **Custom Pivots** (1): get custom pivot report data
-- **Custom Table Record Links** (4): list, create, delete, bulk operations
-- **Custom Tables** (5): list, create, get, update, delete custom table records
-- **Deletions/Recycle Bin** (2): list recycle bin, restore deleted items
-- **Historical Audits** (2): list historical audits, export audit history
-- **Idea Organizations** (5): list, create, get, update, delete idea orgs
-- **Identity Providers** (3): list, configure, test identity providers
-- **Integration Changes** (1): send record to integration (push workflow)
-- **Paid Seat Groups** (3): list, get details, manage assignments
-- **Personas** (4): list, create, get, update personas
-- **Roll-up Releases** (5): list, create, get, update, delete portfolio releases
-- **Schedulable Changes** (3): list, create, delete future-dated changes
-- **Schedules** (4): list, create, update, delete schedules
-- **Scoring Systems** (4): list, create, update, delete scoring metrics
-- **Team Memberships** (3): list, add, remove team member assignments
-- **Teams** (6): list, create, get, update, delete teams; list team members
-- **Time Tracking** (5): create, list, update, delete time entries; get time summary
-- **Webhooks** (4): list, create, update, delete webhooks
+- [ ] **stdio transport documentation**: MCP best practices recommend stdio for local use. README should document both stdio and HTTP transport options.
+- [ ] **MCP-native error codes**: errors.py defines the hierarchy but tools catch exceptions and return JSON error strings instead of raising McpError with proper error codes (-32602, -32603, etc.).
+- [ ] **Resource subscriptions**: MCP spec recommends `notifications/resources/updated` for changing resources. Not implemented.
+- [ ] **Progress notifications**: Long-running operations should send progress updates. Not implemented.
+- [ ] **Output schemas**: MCP spec recommends `outputSchema` for structured tool responses. Not implemented.
+- [ ] **listChanged notifications**: Should notify when available tools/resources change. Not implemented.
+
+## P3: Distribution & Adoption
+
+- [ ] **Package as pip installable**: `pip install aha-mcp` would improve adoption.
+- [ ] **Dockerfile**: For containerized deployment.
+- [ ] **manifest.json**: Anthropic plugin format compatibility.
+- [ ] **MCP Inspector testing**: Verify server works with the official MCP Inspector.
+
+## P3: Test Coverage
+
+- [ ] **Resources tests**: No tests for resources.py.
+- [ ] **OAuth tests**: No tests for oauth.py endpoints.
+- [ ] **Integration tests**: No tests that verify actual GraphQL query construction (current tests mock at the function level).
+- [ ] **Error path tests**: Limited negative testing for validation failures.
+- [ ] **Resolver tests**: No tests for resolver.py identifier resolution logic.
