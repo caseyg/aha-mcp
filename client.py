@@ -1,145 +1,261 @@
-"""Aha! API client with GraphQL and authentication support."""
+"""Aha! API client with shared connection pool, retry logic, and auth support.
 
-import os
-import json
+This module provides the low-level transport for every Aha! API call:
+- A single shared ``httpx.AsyncClient`` with connection pooling.
+- ``graphql()`` for GraphQL queries/mutations (parameterized variables only).
+- ``rest_api()`` for REST endpoints.
+- Auth-header helpers for both API-token and OAuth flows.
+"""
+
+import asyncio
 import logging
-from typing import Optional, Dict, Any, List, Tuple, Union
-from dotenv import load_dotenv
-import httpx
-from fastmcp import Context
+import os
+from typing import Any
 
-# Load environment
+import httpx
+from dotenv import load_dotenv
+
+from errors import AhaApiError, AhaAuthError
+
+# ---------------------------------------------------------------------------
+# Environment / configuration
+# ---------------------------------------------------------------------------
+
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Configuration
-AHA_DOMAIN = os.getenv("AHA_DOMAIN", "")
-AHA_API_TOKEN = os.getenv("AHA_API_TOKEN", "")
-OAUTH_CLIENT_ID = os.getenv("OAUTH_CLIENT_ID", "")
-OAUTH_CLIENT_SECRET = os.getenv("OAUTH_CLIENT_SECRET", "")
+AHA_DOMAIN: str = os.getenv("AHA_DOMAIN", "")
+AHA_API_TOKEN: str = os.getenv("AHA_API_TOKEN", "")
+OAUTH_CLIENT_ID: str = os.getenv("OAUTH_CLIENT_ID", "")
+OAUTH_CLIENT_SECRET: str = os.getenv("OAUTH_CLIENT_SECRET", "")
 
-# In-memory token storage (for demonstration)
-oauth_tokens: Dict[str, str] = {}
+# In-memory OAuth token storage (shared with oauth.py via register_oauth_routes).
+oauth_tokens: dict[str, str] = {}
+
+# ---------------------------------------------------------------------------
+# Shared httpx.AsyncClient
+# ---------------------------------------------------------------------------
+
+_client: httpx.AsyncClient | None = None
+
+_RETRYABLE_STATUS_CODES = {429, 503}
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 1.0  # seconds; doubles each attempt
 
 
-def check_auth() -> Optional[str]:
-    """Check if authentication is configured, return error message if not"""
+async def get_client() -> httpx.AsyncClient:
+    """Return (and lazily create) the shared ``httpx.AsyncClient``."""
+    global _client
+    if _client is None:
+        _client = httpx.AsyncClient(
+            timeout=httpx.Timeout(30.0, connect=10.0),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
+        )
+    return _client
+
+
+async def close_client() -> None:
+    """Shut down the shared client (call on server teardown)."""
+    global _client
+    if _client is not None:
+        await _client.aclose()
+        _client = None
+
+
+# ---------------------------------------------------------------------------
+# Authentication helpers
+# ---------------------------------------------------------------------------
+
+
+def check_auth() -> None:
+    """Raise ``AhaAuthError`` if no credentials are available."""
     if not AHA_API_TOKEN and not oauth_tokens:
-        return json.dumps({
-            "error": "Authentication required",
-            "message": "Please set AHA_API_TOKEN environment variable or authenticate with OAuth",
-            "oauth_available": bool(OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET)
-        })
-    return None
+        raise AhaAuthError(
+            "Authentication required.",
+            suggestion=(
+                "Set the AHA_API_TOKEN environment variable or authenticate via OAuth.\n"
+                f"OAuth available: {bool(OAUTH_CLIENT_ID and OAUTH_CLIENT_SECRET)}"
+            ),
+        )
 
 
-def get_auth_headers(ctx: Optional[Context] = None) -> Dict[str, str]:
-    """Get authentication headers for API requests"""
-    # Check for OAuth token first (if we have a user context)
-    if ctx and hasattr(ctx, 'user_id') and ctx.user_id in oauth_tokens:
+def get_auth_headers(ctx: Any = None) -> dict[str, str]:
+    """Build ``Authorization`` headers for an API request.
+
+    Resolution order:
+    1. OAuth token for the current user context (if *ctx* provides a user_id).
+    2. Static ``AHA_API_TOKEN`` env var.
+    3. First available OAuth token (single-user fallback).
+    """
+    # Per-user OAuth token
+    if ctx and hasattr(ctx, "user_id") and getattr(ctx, "user_id", None) in oauth_tokens:
         return {"Authorization": f"Bearer {oauth_tokens[ctx.user_id]}"}
-    
-    # Fall back to API token
+
+    # Static API token
     if AHA_API_TOKEN:
         return {"Authorization": f"Bearer {AHA_API_TOKEN}"}
-    
-    # Check if there's any OAuth token (for single-user scenarios)
+
+    # Single-user OAuth fallback
     if oauth_tokens:
-        # Use the first available token
         token = next(iter(oauth_tokens.values()))
         return {"Authorization": f"Bearer {token}"}
-    
+
     return {}
 
 
-async def graphql(ctx: Context, query: str, variables: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """Execute GraphQL query against Aha! API"""
-    headers = get_auth_headers(ctx)
-    
-    if not headers:
-        raise RuntimeError("No authentication configured")
-    
-    # Determine domain
-    domain = AHA_DOMAIN
-    if not domain and oauth_tokens:
-        # Try to extract domain from OAuth scenario
-        # In a real implementation, you might store domain with the token
-        domain = AHA_DOMAIN or "your-domain"
-    
-    if not domain:
-        raise RuntimeError("AHA_DOMAIN not configured")
-    
-    url = f"https://{domain}.aha.io/api/v2/graphql"
-    
-    async with httpx.AsyncClient() as client:
-        response = await client.post(
-            url,
-            json={"query": query, "variables": variables or {}},
-            headers=headers
+def _require_domain() -> str:
+    """Return the configured Aha! domain or raise."""
+    if not AHA_DOMAIN:
+        raise AhaAuthError(
+            "AHA_DOMAIN not configured.",
+            suggestion="Set the AHA_DOMAIN environment variable (e.g., 'yourcompany').",
         )
-        
-        if response.status_code == 401:
-            raise RuntimeError("Authentication failed. Please check your API token or OAuth credentials.")
-        
-        response.raise_for_status()
-        data = response.json()
-        
-        if "errors" in data and data["errors"]:
-            error_messages = [e.get("message", str(e)) for e in data["errors"]]
-            raise RuntimeError(f"GraphQL errors: {error_messages}")
-        
-        return data.get("data", {})
+    return AHA_DOMAIN
 
 
-async def rest_api(ctx: Context, method: str, endpoint: str, data: Optional[Union[Dict, List[Tuple[str, str]]]] = None, use_form_data: bool = False) -> Any:
-    """Execute REST API request against Aha! API"""
+# ---------------------------------------------------------------------------
+# Retry helper
+# ---------------------------------------------------------------------------
+
+
+async def _request_with_retry(
+    method: str,
+    url: str,
+    **kwargs: Any,
+) -> httpx.Response:
+    """Execute an HTTP request with retry logic for 429/503."""
+    client = await get_client()
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES):
+        try:
+            response = await client.request(method, url, **kwargs)
+            if response.status_code not in _RETRYABLE_STATUS_CODES:
+                return response
+            # Retryable status -- back off and try again.
+            retry_after = float(response.headers.get("Retry-After", _RETRY_BACKOFF * (2**attempt)))
+            logger.warning(
+                "Retryable %s from %s (attempt %d/%d), sleeping %.1fs",
+                response.status_code,
+                url,
+                attempt + 1,
+                _MAX_RETRIES,
+                retry_after,
+            )
+            await asyncio.sleep(retry_after)
+        except httpx.TransportError as exc:
+            last_exc = exc
+            await asyncio.sleep(_RETRY_BACKOFF * (2**attempt))
+
+    # Exhausted retries -- return last response or raise last transport error.
+    if last_exc is not None:
+        raise AhaApiError(f"Request failed after {_MAX_RETRIES} retries: {last_exc}")
+    # If we got here via retryable status codes, return the last response so
+    # callers can inspect it.
+    return response  # type: ignore[possibly-undefined]
+
+
+# ---------------------------------------------------------------------------
+# GraphQL
+# ---------------------------------------------------------------------------
+
+
+async def graphql(
+    query: str,
+    variables: dict[str, Any] | None = None,
+    ctx: Any = None,
+) -> dict[str, Any]:
+    """Execute a GraphQL query/mutation against the Aha! API.
+
+    All queries **must** use ``$variables`` for parameterization -- never
+    f-string interpolation.  This function enforces that by accepting
+    *variables* as a separate dict.
+
+    Raises:
+        AhaAuthError: on 401.
+        AhaApiError: on GraphQL-level errors or unexpected HTTP failures.
+    """
+    check_auth()
+    domain = _require_domain()
+    url = f"https://{domain}.aha.io/api/v2/graphql"
+
     headers = get_auth_headers(ctx)
-    headers["Accept"] = "application/json"
-    
-    if not headers.get("Authorization"):
-        raise RuntimeError("No authentication configured")
-    
-    # Determine domain
-    domain = AHA_DOMAIN
-    if not domain and oauth_tokens:
-        domain = AHA_DOMAIN or "your-domain"
-    
-    if not domain:
-        raise RuntimeError("AHA_DOMAIN not configured")
-    
-    # Construct URL - endpoint should start with /
-    # If endpoint doesn't start with /api/, assume it's a v1 REST API endpoint
+    payload = {"query": query, "variables": variables or {}}
+
+    response = await _request_with_retry("POST", url, json=payload, headers=headers)
+
+    if response.status_code == 401:
+        raise AhaAuthError(
+            "Authentication failed (HTTP 401).",
+            suggestion="Check your API token or re-authenticate via OAuth.",
+        )
+    if response.status_code >= 400:
+        raise AhaApiError(
+            f"Aha! API returned HTTP {response.status_code}: {response.text}"
+        )
+
+    data = response.json()
+    if "errors" in data and data["errors"]:
+        messages = [e.get("message", str(e)) for e in data["errors"]]
+        raise AhaApiError(f"GraphQL errors: {messages}")
+
+    return data.get("data", {})
+
+
+# ---------------------------------------------------------------------------
+# REST API
+# ---------------------------------------------------------------------------
+
+
+async def rest_api(
+    method: str,
+    endpoint: str,
+    data: dict[str, Any] | list | None = None,
+    params: dict[str, str] | None = None,
+    use_form_data: bool = False,
+    ctx: Any = None,
+) -> Any:
+    """Execute a REST API request against the Aha! v1 API.
+
+    *endpoint* should be a path like ``"/features/PROJ-123"`` (the ``/api/v1``
+    prefix is added automatically if missing).
+
+    Raises:
+        AhaAuthError: on 401.
+        AhaApiError: on unexpected HTTP failures.
+    """
+    check_auth()
+    domain = _require_domain()
+
     if not endpoint.startswith("/api/"):
         endpoint = f"/api/v1{endpoint}"
     url = f"https://{domain}.aha.io{endpoint}"
-    
-    async with httpx.AsyncClient() as client:
-        if method.upper() == "GET":
-            response = await client.get(url, headers=headers)
-        elif method.upper() == "POST":
-            if use_form_data and data:
-                # For form data, httpx expects data parameter
-                response = await client.post(url, data=data, headers=headers)
-            else:
-                headers["Content-Type"] = "application/json"
-                response = await client.post(url, json=data, headers=headers)
-        elif method.upper() == "PUT":
-            if use_form_data and data:
-                response = await client.put(url, data=data, headers=headers)
-            else:
-                headers["Content-Type"] = "application/json"
-                response = await client.put(url, json=data, headers=headers)
-        elif method.upper() == "DELETE":
-            response = await client.delete(url, headers=headers)
+
+    headers = get_auth_headers(ctx)
+    headers["Accept"] = "application/json"
+
+    kwargs: dict[str, Any] = {"headers": headers}
+    if params:
+        kwargs["params"] = params
+
+    if data is not None:
+        if use_form_data:
+            kwargs["data"] = data
         else:
-            raise ValueError(f"Unsupported HTTP method: {method}")
-        
-        if response.status_code == 401:
-            raise RuntimeError("Authentication failed. Please check your API token or OAuth credentials.")
-        
-        response.raise_for_status()
-        
-        # Some endpoints return empty responses
-        if response.content:
-            return response.json()
-        return None
+            headers["Content-Type"] = "application/json"
+            kwargs["json"] = data
+
+    response = await _request_with_retry(method.upper(), url, **kwargs)
+
+    if response.status_code == 401:
+        raise AhaAuthError(
+            "Authentication failed (HTTP 401).",
+            suggestion="Check your API token or re-authenticate via OAuth.",
+        )
+    if response.status_code >= 400:
+        raise AhaApiError(
+            f"Aha! REST API returned HTTP {response.status_code}: {response.text}"
+        )
+
+    if response.content:
+        return response.json()
+    return None

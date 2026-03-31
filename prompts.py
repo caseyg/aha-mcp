@@ -21,15 +21,9 @@ def register_prompts(mcp_instance: FastMCP):
     mcp.prompt(bug_triage_session)
     mcp.prompt(feature_dependencies_analysis)
     mcp.prompt(sprint_retrospective)
-    mcp.prompt(
-        description="Generate a prompt to create weekly status report",
-        tags={"reporting", "status", "weekly"}
-    )(weekly_status_report)
+    mcp.prompt(weekly_status_report)
     mcp.prompt(idea_to_feature_conversion)
-    mcp.prompt(
-        enabled=True,
-        tags={"automation", "integration"}
-    )(integration_checklist)
+    mcp.prompt(integration_checklist)
 
 
 def analyze_feature_backlog(project_id: str, release_id: Optional[str] = None) -> list[Message]:
